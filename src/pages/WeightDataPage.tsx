@@ -6,7 +6,7 @@ import { RecordFormModal } from '../components/RecordFormModal'
 import { useData } from '../hooks/useData'
 import type { Level, WeightRecord } from '../data/types'
 import { LEVELS } from '../data/types'
-import { formatDate, formatWeight } from '../utils/helpers'
+import { formatDate, formatWeightKg } from '../utils/helpers'
 
 type Tab = 'All' | Level
 
@@ -105,7 +105,7 @@ export function WeightDataPage() {
                   <th>Description</th>
                   <th>Lenovo PN</th>
                   <th>Category</th>
-                  <th>Weight</th>
+                  <th>Weight (kg)</th>
                   <th>Date</th>
                   <th>Source</th>
                   <th>Status</th>
@@ -124,7 +124,7 @@ export function WeightDataPage() {
                     </td>
                     <td>{r.lenovoPn || '—'}</td>
                     <td>{r.category || '—'}</td>
-                    <td>{formatWeight(r)}</td>
+                    <td>{formatWeightKg(r)}</td>
                     <td>{formatDate(r.measuredDate)}</td>
                     <td>{r.source}</td>
                     <td>

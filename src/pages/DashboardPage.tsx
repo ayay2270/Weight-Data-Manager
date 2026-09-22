@@ -17,7 +17,8 @@ import { useData } from '../hooks/useData'
 import {
   collectedByLevel,
   formatDate,
-  formatWeight,
+  formatWeightKg,
+  getWeightKg,
   latestUpdated,
   overallDataCompleteness,
   percentLabel,
@@ -40,8 +41,9 @@ export function DashboardPage() {
   const distribution = useMemo(() => {
     const map = new Map<string, number>()
     for (const r of records) {
-      if (r.weightKg == null) continue
-      map.set(r.level, (map.get(r.level) || 0) + r.weightKg)
+      const weightKg = getWeightKg(r)
+      if (weightKg == null) continue
+      map.set(r.level, (map.get(r.level) || 0) + weightKg)
     }
     return ['Part', 'Node', 'Rack', 'Package'].map((level) => ({
       level,
@@ -156,7 +158,7 @@ export function DashboardPage() {
                     <th>Project</th>
                     <th>Level</th>
                     <th>Description</th>
-                    <th>Weight</th>
+                    <th>Weight (kg)</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -170,7 +172,7 @@ export function DashboardPage() {
                       <td className="description" title={r.description}>
                         {r.description}
                       </td>
-                      <td>{formatWeight(r)}</td>
+                      <td>{formatWeightKg(r)}</td>
                       <td>
                         <span className={`badge ${r.status}`}>{r.status}</span>
                       </td>

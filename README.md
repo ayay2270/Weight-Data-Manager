@@ -6,7 +6,7 @@ Browser-based engineering weight database for Part / Node / Rack / Package measu
 
 Replace scattered Excel weight logs with a shared-style web app that:
 
-- Normalizes Part (g), Node / Rack / Package (kg) records
+- Accepts g or kg inputs and stores every record as canonical `weight_kg`
 - Shows project collection progress and completeness (Collected ÷ Expected)
 - Supports add / edit / delete / duplicate workflows
 - Imports the existing Weight Measurement Record X01 workbook
@@ -85,6 +85,7 @@ npx --yes gh-pages -d dist -b gh-pages
 
 ## Data notes
 
+- Record tables display canonical kilograms to three decimal places; the original numeric input and unit remain available when editing.
 - Completeness = records with status Measured or Verified (and a weight) ÷ project `expectedItems`
 - Expected counts are editable per project in the Projects UI — not hardcoded in dashboard widgets
 - Source values: Internal Measurement, Supplier, Specification, Estimated, Unknown

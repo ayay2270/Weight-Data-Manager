@@ -1,10 +1,18 @@
 import seed from '../data/seed.json'
 import type { AppData } from '../data/types'
+import { normalizeWeightRecord } from './helpers'
 
 const STORAGE_KEY = 'wdm.v1.appData'
 
 export function loadSeed(): AppData {
-  return structuredClone(seed) as AppData
+  return normalizeAppData(structuredClone(seed) as AppData)
+}
+
+export function normalizeAppData(data: AppData): AppData {
+  return {
+    ...data,
+    records: data.records.map((record) => normalizeWeightRecord(record)),
+  }
 }
 
 export function loadAppData(): AppData {
@@ -13,7 +21,7 @@ export function loadAppData(): AppData {
     if (!raw) return loadSeed()
     const parsed = JSON.parse(raw) as AppData
     if (!parsed?.projects || !parsed?.records || !parsed?.settings) return loadSeed()
-    return parsed
+    return normalizeAppData(parsed)
   } catch {
     return loadSeed()
   }
@@ -36,5 +44,5 @@ export function importBackupJson(text: string): AppData {
   if (!parsed?.projects || !parsed?.records || !parsed?.settings) {
     throw new Error('Invalid backup file')
   }
-  return parsed
+  return normalizeAppData(parsed)
 }

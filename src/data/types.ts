@@ -44,6 +44,9 @@ export interface WeightRecord {
   category?: string | null
   weightValue?: number | null
   weightUnit: WeightUnit
+  /** Canonical persisted mass, always expressed in kilograms. */
+  weight_kg?: number | null
+  /** Legacy camelCase field accepted when reading older browser data. */
   weightKg?: number | null
   measuredDate?: string | null
   source: DataSource

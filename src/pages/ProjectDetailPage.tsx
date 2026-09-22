@@ -7,7 +7,8 @@ import { LEVELS } from '../data/types'
 import {
   countByLevel,
   formatDate,
-  formatWeight,
+  formatWeightKg,
+  getWeightKg,
   percentLabel,
   projectCompleteness,
 } from '../utils/helpers'
@@ -39,7 +40,7 @@ export function ProjectDetailPage() {
   const totals = countByLevel(projectRecords)
   const missing = projectRecords.filter((r) => r.status === 'Missing' || r.weightValue == null)
   const latest = projectRecords.slice(0, 6)
-  const totalKg = projectRecords.reduce((sum, r) => sum + (r.weightKg || 0), 0)
+  const totalKg = projectRecords.reduce((sum, r) => sum + (getWeightKg(r) || 0), 0)
 
   const gaps = LEVELS.flatMap((level) => {
     const shortfall = Math.max(0, project.expectedItems[level] - collected[level])
@@ -128,7 +129,7 @@ export function ProjectDetailPage() {
                   <tr>
                     <th>Level</th>
                     <th>Description</th>
-                    <th>Weight</th>
+                    <th>Weight (kg)</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -139,7 +140,7 @@ export function ProjectDetailPage() {
                         <span className="badge level">{r.level}</span>
                       </td>
                       <td className="description">{r.description}</td>
-                      <td>{formatWeight(r)}</td>
+                      <td>{formatWeightKg(r)}</td>
                       <td>
                         <span className={`badge ${r.status}`}>{r.status}</span>
                       </td>

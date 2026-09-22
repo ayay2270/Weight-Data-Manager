@@ -75,6 +75,7 @@ export function RecordFormModal({
 
   const showPartFields = form.level === 'Part' || form.level === 'Node' || form.level === 'Rack'
   const showPackageHint = form.level === 'Package'
+  const convertedKg = form.weightValue.trim() === '' ? null : toWeightKg(Number(form.weightValue), form.weightUnit)
 
   const activeProjects = useMemo(
     () => projects.filter((p) => p.status === 'Active' || p.id === form.projectId),
@@ -85,13 +86,9 @@ export function RecordFormModal({
 
   function setLevel(level: Level) {
     setForm((prev) => {
-      let weightUnit = prev.weightUnit
-      if (level === 'Part') weightUnit = 'g'
-      else if (prev.weightUnit === 'g') weightUnit = 'kg'
       return {
         ...prev,
         level,
-        weightUnit,
         category: level === 'Package' && !prev.category ? 'Packaging' : prev.category,
       }
     })
@@ -134,7 +131,7 @@ export function RecordFormModal({
       category: form.category.trim() || (form.level === 'Package' ? 'Packaging' : null),
       weightValue,
       weightUnit: form.weightUnit,
-      weightKg: toWeightKg(weightValue, form.weightUnit),
+      weight_kg: toWeightKg(weightValue, form.weightUnit),
       measuredDate: form.measuredDate || null,
       source: form.source,
       status: form.status,
@@ -228,25 +225,28 @@ export function RecordFormModal({
             />
           </label>
         ) : null}
-        <label>
+        <label className="span-2">
           Weight
-          <input
-            type="number"
-            step="any"
-            min="0"
-            value={form.weightValue}
-            onChange={(e) => setForm({ ...form, weightValue: e.target.value })}
-          />
-        </label>
-        <label>
-          Unit
-          <select
-            value={form.weightUnit}
-            onChange={(e) => setForm({ ...form, weightUnit: e.target.value as WeightUnit })}
-          >
-            <option value="g">g</option>
-            <option value="kg">kg</option>
-          </select>
+          <div className="weight-input">
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={form.weightValue}
+              onChange={(e) => setForm({ ...form, weightValue: e.target.value })}
+            />
+            <select
+              aria-label="Weight unit"
+              value={form.weightUnit}
+              onChange={(e) => setForm({ ...form, weightUnit: e.target.value as WeightUnit })}
+            >
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+            </select>
+          </div>
+          <small className="weight-preview">
+            Converted: {convertedKg != null && Number.isFinite(convertedKg) ? `${convertedKg.toFixed(3)} kg` : '—'}
+          </small>
         </label>
         <label>
           Measured Date

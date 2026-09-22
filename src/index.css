@@ -516,6 +516,17 @@ tr.clickable:hover {
   font-weight: 600;
 }
 
+.weight-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 8px;
+}
+
+.weight-preview {
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .span-2 {
   grid-column: span 2;
 }

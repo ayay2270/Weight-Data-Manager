@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { AppData, DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
-import { cleanText, nowIso, toWeightKg, uid } from './helpers'
+import { cleanText, getWeightKg, nowIso, toWeightKg, uid } from './helpers'
 
 const LEVEL_SHEETS: { level: Level; names: string[]; defaultUnit: WeightUnit }[] = [
   { level: 'Part', names: ['Part Level', 'Part'], defaultUnit: 'g' },
@@ -12,16 +12,19 @@ const LEVEL_SHEETS: { level: Level; names: string[]; defaultUnit: WeightUnit }[]
 function parseWeight(
   raw: unknown,
   defaultUnit: WeightUnit,
+  suppliedUnit?: unknown,
 ): { value: number | null; unit: WeightUnit; status: RecordStatus; original: string | null; source: DataSource } {
+  const supplied = cleanText(suppliedUnit)?.toLowerCase()
+  const inputUnit: WeightUnit = supplied === 'g' ? 'g' : supplied === 'kg' ? 'kg' : defaultUnit
   if (raw == null || raw === '') {
-    return { value: null, unit: defaultUnit, status: 'Missing', original: null, source: 'Unknown' }
+    return { value: null, unit: inputUnit, status: 'Missing', original: null, source: 'Unknown' }
   }
   if (typeof raw === 'number' && Number.isFinite(raw)) {
-    return { value: raw, unit: defaultUnit, status: 'Measured', original: null, source: 'Internal Measurement' }
+    return { value: raw, unit: inputUnit, status: 'Measured', original: null, source: 'Internal Measurement' }
   }
   const s = cleanText(raw)
   if (!s) {
-    return { value: null, unit: defaultUnit, status: 'Missing', original: null, source: 'Unknown' }
+    return { value: null, unit: inputUnit, status: 'Missing', original: null, source: 'Unknown' }
   }
   const kgMatch = s.match(/([\d.]+)\s*kg/i)
   const gMatch = s.match(/([\d.]+)\s*g\b/i)
@@ -32,13 +35,19 @@ function parseWeight(
     if (gMatch) {
       return { value: Number(gMatch[1]), unit: 'g', status: 'Estimated', original: s, source: 'Estimated' }
     }
-    return { value: null, unit: defaultUnit, status: 'Missing', original: s, source: 'Unknown' }
+    return { value: null, unit: inputUnit, status: 'Missing', original: s, source: 'Unknown' }
+  }
+  if (kgMatch) {
+    return { value: Number(kgMatch[1]), unit: 'kg', status: 'Measured', original: null, source: 'Internal Measurement' }
+  }
+  if (gMatch) {
+    return { value: Number(gMatch[1]), unit: 'g', status: 'Measured', original: null, source: 'Internal Measurement' }
   }
   const num = Number(s.replace(/,/g, ''))
   if (Number.isFinite(num)) {
-    return { value: num, unit: defaultUnit, status: 'Measured', original: null, source: 'Internal Measurement' }
+    return { value: num, unit: inputUnit, status: 'Measured', original: null, source: 'Internal Measurement' }
   }
-  return { value: null, unit: defaultUnit, status: 'Missing', original: s, source: 'Unknown' }
+  return { value: null, unit: inputUnit, status: 'Missing', original: s, source: 'Unknown' }
 }
 
 function sheetToRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
@@ -77,6 +86,21 @@ function pick(row: Record<string, unknown>, keys: string[]): unknown {
     if (found && row[found] != null && String(row[found]).trim() !== '') return row[found]
   }
   return null
+}
+
+function pickWeight(row: Record<string, unknown>): { raw: unknown; unit: unknown } {
+  const variants: [string, WeightUnit][] = [
+    ['Weight (g)', 'g'],
+    ['Weight(g)', 'g'],
+    ['Weight (kg)', 'kg'],
+    ['Weight(kg)', 'kg'],
+    ['Weight', 'kg'],
+  ]
+  for (const [header, headerUnit] of variants) {
+    const raw = pick(row, [header])
+    if (raw != null) return { raw, unit: pick(row, ['Unit', 'Weight Unit']) ?? headerUnit }
+  }
+  return { raw: null, unit: pick(row, ['Unit', 'Weight Unit']) }
 }
 
 function excelDate(value: unknown): string | null {
@@ -139,8 +163,8 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
       const projectCode = cleanText(pick(row, ['Project'])) || 'UNASSIGNED'
       const project = ensureProject(projects, projectCode, stamp)
       touched.add(project.code)
-      const weightRaw = pick(row, ['Weight (g)', 'Weight (kg)', 'Weight', 'Weight(g)', 'Weight(kg)'])
-      const parsed = parseWeight(weightRaw, defaultUnit)
+      const weight = pickWeight(row)
+      const parsed = parseWeight(weight.raw, defaultUnit, weight.unit)
       if (parsed.original) warnings.push(`${description}: ${parsed.original}`)
       const note = cleanText(pick(row, ['Note', 'Notes']))
       const record: WeightRecord = {
@@ -155,7 +179,7 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
         category: cleanText(pick(row, ['Part Category', 'Category'])) || (level === 'Package' ? 'Packaging' : null),
         weightValue: parsed.value,
         weightUnit: parsed.unit,
-        weightKg: toWeightKg(parsed.value, parsed.unit),
+        weight_kg: toWeightKg(parsed.value, parsed.unit),
         measuredDate: excelDate(pick(row, ['Measured Date', 'Date'])),
         source: parsed.source,
         status: parsed.status,
@@ -184,7 +208,8 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
       const projectCode = cleanText(pick(row, ['Project'])) || 'UNASSIGNED'
       const project = ensureProject(projects, projectCode, stamp)
       touched.add(project.code)
-      const parsed = parseWeight(pick(row, ['Weight (g)', 'Weight (kg)', 'Weight']), defaultUnit)
+      const weight = pickWeight(row)
+      const parsed = parseWeight(weight.raw, defaultUnit, weight.unit)
       const record: WeightRecord = {
         id: uid('rec'),
         projectId: project.id,
@@ -197,7 +222,7 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
         category: cleanText(pick(row, ['Part Category', 'Category'])),
         weightValue: parsed.value,
         weightUnit: parsed.unit,
-        weightKg: toWeightKg(parsed.value, parsed.unit),
+        weight_kg: toWeightKg(parsed.value, parsed.unit),
         measuredDate: excelDate(pick(row, ['Measured Date', 'Date'])),
         source: (cleanText(pick(row, ['Source', 'Data Source'])) as DataSource) || parsed.source,
         status: (cleanText(pick(row, ['Status'])) as RecordStatus) || parsed.status,
@@ -224,9 +249,8 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
 
 export function exportWorkbook(data: AppData): ArrayBuffer {
   const wb = XLSX.utils.book_new()
-  for (const { level, names, defaultUnit } of LEVEL_SHEETS) {
+  for (const { level, names } of LEVEL_SHEETS) {
     const sheetName = names[0]
-    const unitHeader = defaultUnit === 'g' ? 'Weight (g)' : 'Weight (kg)'
     const rows = data.records
       .filter((r) => r.level === level)
       .map((r) => ({
@@ -235,7 +259,7 @@ export function exportWorkbook(data: AppData): ArrayBuffer {
         'MSFT PN': r.customerPn || '',
         Manufacturer: r.manufacturer || '',
         'Part Category': r.category || '',
-        [unitHeader]: r.weightValue ?? r.originalWeightText ?? '',
+        'Weight (kg)': getWeightKg(r) ?? r.originalWeightText ?? '',
         'Measured Date': r.measuredDate || '',
         Project: r.projectCode,
         Note: r.note || '',
@@ -257,7 +281,7 @@ export function exportCsv(data: AppData): string {
     'MSFT PN',
     'Manufacturer',
     'Category',
-    'Weight',
+    'Weight (kg)',
     'Unit',
     'Measured Date',
     'Source',
@@ -274,8 +298,8 @@ export function exportCsv(data: AppData): string {
       r.customerPn || '',
       r.manufacturer || '',
       r.category || '',
-      r.weightValue ?? '',
-      r.weightUnit,
+      getWeightKg(r) ?? '',
+      'kg',
       r.measuredDate || '',
       r.source,
       r.status,

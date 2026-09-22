@@ -22,18 +22,34 @@ export function toWeightKg(value: number | null | undefined, unit: WeightUnit): 
   return unit === 'g' ? value / 1000 : value
 }
 
-export function formatWeight(record: {
-  weightValue?: number | null
-  weightUnit: WeightUnit
-  status: WeightRecord['status']
-}): string {
-  if (record.weightValue == null) {
-    return '—'
-  }
-  const n = record.weightValue
-  const formatted =
-    Math.abs(n) >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 1 }) : n.toLocaleString('en-US', { maximumFractionDigits: 3 })
-  return `${formatted} ${record.weightUnit}`
+export function getWeightKg(record: Pick<WeightRecord, 'weight_kg' | 'weightKg' | 'weightValue' | 'weightUnit'>): number | null {
+  if (typeof record.weight_kg === 'number' && Number.isFinite(record.weight_kg)) return record.weight_kg
+  if (typeof record.weightKg === 'number' && Number.isFinite(record.weightKg)) return record.weightKg
+  return toWeightKg(record.weightValue, record.weightUnit)
+}
+
+export function normalizeWeightRecord<T extends Partial<WeightRecord>>(record: T): T & WeightRecord {
+  const weightUnit: WeightUnit = record.weightUnit === 'g' ? 'g' : 'kg'
+  const legacyWeight = typeof record.weightValue === 'number' && Number.isFinite(record.weightValue) ? record.weightValue : null
+  const suppliedCanonical =
+    typeof record.weight_kg === 'number' && Number.isFinite(record.weight_kg)
+      ? record.weight_kg
+      : typeof record.weightKg === 'number' && Number.isFinite(record.weightKg)
+        ? record.weightKg
+        : null
+  const weight_kg = legacyWeight == null ? suppliedCanonical : toWeightKg(legacyWeight, weightUnit)
+  const { weightKg: _legacyWeightKg, ...withoutLegacyWeightKg } = record
+  return {
+    ...withoutLegacyWeightKg,
+    weightValue: legacyWeight ?? weight_kg,
+    weightUnit: legacyWeight == null ? 'kg' : weightUnit,
+    weight_kg,
+  } as T & WeightRecord
+}
+
+export function formatWeightKg(record: Pick<WeightRecord, 'weight_kg' | 'weightKg' | 'weightValue' | 'weightUnit'>): string {
+  const weightKg = getWeightKg(record)
+  return weightKg == null ? '—' : `${weightKg.toFixed(3)} kg`
 }
 
 export function formatDate(iso?: string | null): string {
@@ -55,7 +71,7 @@ export function countByLevel(records: WeightRecord[]): ExpectedItems {
 export function collectedByLevel(records: WeightRecord[]): ExpectedItems {
   const out = emptyExpected()
   for (const r of records) {
-    if (COLLECTED_STATUSES.includes(r.status) && r.weightValue != null) out[r.level] += 1
+    if (COLLECTED_STATUSES.includes(r.status) && getWeightKg(r) != null) out[r.level] += 1
   }
   return out
 }

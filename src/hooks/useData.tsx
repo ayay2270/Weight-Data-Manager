@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { AppData, AppSettings, Project, WeightRecord } from '../data/types'
-import { nowIso, toWeightKg, uid } from '../utils/helpers'
-import { clearAppData, loadAppData, loadSeed, saveAppData } from '../utils/storage'
+import { normalizeWeightRecord, nowIso, uid } from '../utils/helpers'
+import { clearAppData, loadAppData, loadSeed, normalizeAppData, saveAppData } from '../utils/storage'
 
 interface DataContextValue {
   data: AppData
@@ -37,7 +37,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [data])
 
   const replaceData = useCallback((next: AppData) => {
-    setData({ ...next, settings: { ...next.settings, lastUpdated: nowIso() } })
+    const normalized = normalizeAppData(next)
+    setData({ ...normalized, settings: { ...normalized.settings, lastUpdated: nowIso() } })
   }, [])
 
   const upsertProject = useCallback((project: Project) => {
@@ -67,8 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setData((prev) => {
       const stamp = nowIso()
       const normalized: WeightRecord = {
-        ...record,
-        weightKg: toWeightKg(record.weightValue ?? null, record.weightUnit),
+        ...normalizeWeightRecord(record),
         updatedAt: stamp,
         createdAt: record.createdAt || stamp,
       }
@@ -94,7 +94,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!src) return prev
       const stamp = nowIso()
       const copy: WeightRecord = {
-        ...src,
+        ...normalizeWeightRecord(src),
         id: uid('rec'),
         description: `${src.description} (copy)`,
         status: 'Draft',
