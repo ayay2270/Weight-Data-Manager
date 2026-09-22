@@ -5,9 +5,9 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('app\\templates', 'app\\templates'),
-        ('app\\static', 'app\\static'),
-        ('data\\Weight Measurement Record_X01.xlsx', 'data'),
+        ('app/templates', 'app/templates'),
+        ('app/static', 'app/static'),
+        ('data/Weight Measurement Record_X01.xlsx', 'data'),
     ],
     hiddenimports=[
         'app.main',
