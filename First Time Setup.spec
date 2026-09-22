@@ -1,4 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
+# DEPRECATED: First Time Setup is integrated into Weight Data Manager.exe.
+# Kept only for historical reference; build_release.bat no longer builds this.
 
 a = Analysis(
     ['first_time_setup.py'],

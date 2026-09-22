@@ -1,17 +1,29 @@
-"""Tests for daily launcher backup rules and launcher URL helpers."""
+"""Tests for daily launcher backup rules, URLs, and one-shot network setup."""
 from __future__ import annotations
 
 import sqlite3
 
 from app.launch_backup import backup_if_due, prune_backups
-from desktop_launcher import fallback_url, primary_url
-from first_time_setup import RULE, add_rule_command
+from desktop_launcher import (
+    best_department_url,
+    fallback_url,
+    mark_setup_handled,
+    needs_first_time_network_setup,
+    primary_url,
+    setup_already_handled,
+)
+from first_time_setup import IT_ASSISTANCE_MESSAGE, RULE, add_rule_command
 
 
 def test_primary_and_fallback_urls():
     assert primary_url("HOST-PC", 8000) == "http://HOST-PC:8000"
     assert fallback_url("10.1.2.3", 8000) == "http://10.1.2.3:8000"
     assert fallback_url("", 8000) == "Network IP unavailable"
+
+
+def test_best_department_url_prefers_hostname():
+    assert best_department_url("HOST-PC", "10.1.2.3", 8000) == "http://HOST-PC:8000"
+    assert best_department_url("", "10.1.2.3", 8000) == "http://10.1.2.3:8000"
 
 
 def test_firewall_add_command_is_domain_private_only():
@@ -21,6 +33,29 @@ def test_firewall_add_command_is_domain_private_only():
     assert "profile=domain,private" in command
     profile_part = command.lower().split("profile=")[-1]
     assert "public" not in profile_part
+    assert "IT assistance" in IT_ASSISTANCE_MESSAGE
+    assert "8000" in IT_ASSISTANCE_MESSAGE
+
+
+def test_setup_marker_skips_repeat_prompt(tmp_path, monkeypatch):
+    monkeypatch.setattr("desktop_launcher.sys.platform", "win32")
+    monkeypatch.setattr("desktop_launcher.rule_exists", lambda: False)
+    assert needs_first_time_network_setup(tmp_path) is True
+    mark_setup_handled(tmp_path)
+    assert setup_already_handled(tmp_path) is True
+    assert needs_first_time_network_setup(tmp_path) is False
+
+
+def test_existing_firewall_rule_skips_setup(tmp_path, monkeypatch):
+    monkeypatch.setattr("desktop_launcher.sys.platform", "win32")
+    monkeypatch.setattr("desktop_launcher.rule_exists", lambda: True)
+    assert needs_first_time_network_setup(tmp_path) is False
+    assert setup_already_handled(tmp_path) is True
+
+
+def test_non_windows_never_needs_firewall_setup(tmp_path, monkeypatch):
+    monkeypatch.setattr("desktop_launcher.sys.platform", "linux")
+    assert needs_first_time_network_setup(tmp_path) is False
 
 
 def test_daily_backup_same_day_no_duplicate_and_prune(tmp_path, monkeypatch):
@@ -80,7 +115,6 @@ def test_migrate_portable_data_copies_once(tmp_path, monkeypatch):
     assert destination.read_bytes() == b"sqlite-demo"
     assert (home / "backups" / old_backup.name).read_bytes() == b"backup-demo"
 
-    # Second run must not overwrite an existing AppData DB
     source.write_bytes(b"changed")
     migrate_portable_data_if_needed(portable, home)
     assert destination.read_bytes() == b"sqlite-demo"

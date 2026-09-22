@@ -4,36 +4,38 @@ Weight Data Manager is a department-shared web application. One designated Windo
 
 ## Release folder
 
-After `build_release.bat`, deploy the folder `dist\Weight Data Manager`. Its outer layer is intentionally simple:
+After `build_release.bat`, deploy the folder `dist\Weight Data Manager`. Outer layer:
 
 ```text
 Weight Data Manager.exe
-First Time Setup.exe
 README.md
-_internal\          (required PyInstaller runtime — do not delete)
+_internal\          (required PyInstaller onedir runtime — do not delete)
 ```
 
-Do not hand-edit files inside `_internal`. Operational data is **not** stored in this folder by default.
+There is no separate First Time Setup executable. Network setup runs inside `Weight Data Manager.exe` on first launch only when needed. Operational data is **not** stored in this folder by default.
+
+One-file packaging was evaluated and not used: onedir starts more reliably with templates/static assets and is easier for antivirus and upgrades.
 
 ## Normal daily use (Host PC)
 
 1. Double-click `Weight Data Manager.exe`.
 2. Keep the small status window open — closing it stops the shared server.
-3. Confirm **System Running**, **Database OK**, and **Backup OK**.
-4. The Dashboard opens in the default browser. Use **Open** anytime, or **Copy** to share the **Department URL** (`http://HOSTNAME:8000`).
-5. If a colleague's PC cannot resolve the hostname, share the **Fallback** IP address shown on the status window.
+3. Confirm **● Running**.
+4. Use **Open** or **Copy Link** for the Department URL (`http://HOSTNAME:8000`, with IP as fallback when needed).
+5. Database, backup, firewall, paths, port, and server details stay under **Show Details**.
 
-Normal users do not run PowerShell, BAT files, Python, or manual backups. Technical paths and listen details stay under **Show Details**.
+Normal users do not run PowerShell, BAT files, Python, or manual backups.
 
 The Host PC must stay powered on, on the company network, and awake while colleagues are using the system.
 
-## First deployment only
+## First launch (Host PC only)
 
-1. Copy the entire release folder to a stable local path on the Host PC, for example `C:\DepartmentApps\Weight Data Manager`.
-2. Double-click `First Time Setup.exe` once.
-3. Click **Configure Firewall** and approve the administrator prompt. The tool checks for an existing rule first and does not create duplicates. If company policy blocks the change, ask IT to allow inbound TCP 8000 for Domain and Private networks only.
-4. Double-click `Weight Data Manager.exe`.
-5. From one colleague's PC on the same company network, open the Department URL from the status window.
+1. Copy the entire release folder to a stable local path, for example `C:\DepartmentApps\Weight Data Manager`.
+2. Double-click `Weight Data Manager.exe`.
+3. If the firewall rule is already present, the app starts normally with no setup UI.
+4. If the rule is missing, the window shows **First-time network setup is required.** Click **Start Setup** and approve the Windows administrator prompt. The app creates an inbound allow rule for TCP 8000 on Domain and Private networks only, then continues launching.
+5. If company policy blocks the change, the app shows **Network setup requires IT assistance.** with the inbound TCP 8000 / Domain / Private requirement. Daily local use still continues; colleagues need IT to finish the rule.
+6. Later launches never show the setup panel again.
 
 Equivalent IT rule (optional central deployment):
 
@@ -80,9 +82,9 @@ If `weight_manager.db-wal` or `weight_manager.db-shm` remains after shutdown, as
 ## Troubleshooting
 
 - Local browser will not open: close all Weight Data Manager windows and start once more.
-- Colleagues cannot connect: same company network, and the one-time firewall rule must exist.
-- Hostname URL fails on another PC: use the Fallback IP and ask IT about internal hostname resolution.
-- Details and log path: click **Show Details** on the status window.
+- Colleagues cannot connect: same company network, and the inbound TCP 8000 Domain/Private rule must exist (Ask IT if first-launch setup was blocked).
+- Hostname URL fails on another PC: use the Fallback IP under **Show Details** and ask IT about internal hostname resolution.
+- Details and log path: click **Show Details**.
 - Port 8000 must be free.
 
 ## Development and rebuild (maintainers)
@@ -90,10 +92,10 @@ If `weight_manager.db-wal` or `weight_manager.db-shm` remains after shutdown, as
 ```text
 setup_server.bat      create .venv and install requirements
 run_tests.bat         pytest
-build_release.bat     rebuild both EXEs via the .spec files into dist\Weight Data Manager
+build_release.bat     rebuild Weight Data Manager.exe via the .spec into dist\Weight Data Manager
 start_server.bat      developer server without the Tk launcher
 ```
 
-Windows is required to produce the release EXEs (PyInstaller + Tk + firewall helper). On Linux CI or Cloud Agent hosts, run tests and keep scripts current; document that EXE rebuild needs a Windows maintainer machine.
+Windows is required to produce the release EXE. On Linux CI or Cloud Agent hosts, run tests and keep scripts current; document that EXE rebuild needs a Windows maintainer machine.
 
 Version 1 intentionally does not include login, SSO, roles, Docker, cloud deployment, Teams/email notification, PLM/BOM integration, or CAE calculations.
