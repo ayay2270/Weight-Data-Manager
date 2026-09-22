@@ -372,6 +372,7 @@ textarea {
 
 .table-wrap {
   overflow: auto;
+  max-width: 100%;
 }
 
 table {
@@ -406,6 +407,125 @@ tr.clickable:hover {
   max-width: 340px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.weight-table-project {
+  width: 92px;
+  min-width: 92px;
+  font-weight: 700;
+}
+
+.weight-table-description {
+  width: 230px;
+  min-width: 230px;
+  max-width: 230px;
+  white-space: normal;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+th.weight-table-description {
+  display: table-cell;
+}
+
+.weight-table-note {
+  width: 150px;
+  min-width: 150px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.columns-menu {
+  position: relative;
+}
+
+.columns-trigger {
+  min-width: 110px;
+}
+
+.columns-dropdown {
+  position: absolute;
+  z-index: 15;
+  top: calc(100% + 7px);
+  right: 0;
+  width: 255px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+}
+
+.columns-dropdown-head,
+.columns-dropdown-actions,
+.table-pagination,
+.pagination-actions {
+  display: flex;
+  align-items: center;
+}
+
+.columns-dropdown-head {
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.columns-options {
+  display: grid;
+  gap: 5px;
+  max-height: 320px;
+  margin: 10px 0;
+  overflow: auto;
+}
+
+.columns-options label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.columns-options .locked-column {
+  color: var(--muted);
+}
+
+.columns-options input {
+  accent-color: var(--blue);
+}
+
+.columns-dropdown-actions {
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #edf0f3;
+}
+
+.columns-dropdown-actions .button {
+  flex: 1;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.table-pagination {
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 0;
+}
+
+.pagination-actions {
+  gap: 4px;
+  color: var(--muted);
+}
+
+.pagination-actions .button {
+  padding: 5px 7px;
 }
 
 .badge {

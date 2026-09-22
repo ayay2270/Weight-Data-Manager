@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, Copy, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Columns3, Copy, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { RecordFormModal } from '../components/RecordFormModal'
 import { useData } from '../hooks/useData'
@@ -8,17 +8,85 @@ import type { Level, RecordStatus, WeightRecord } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
 import { formatWeightKg, statusBadgeClass, todayDate } from '../utils/helpers'
 
-type Tab = 'All' | Level
+type ColumnKey =
+  | 'project'
+  | 'description'
+  | 'lenovoPn'
+  | 'customerPn'
+  | 'manufacturer'
+  | 'category'
+  | 'buildPhase'
+  | 'level'
+  | 'weight'
+  | 'measuredDate'
+  | 'note'
+  | 'source'
+  | 'measuredBy'
+  | 'status'
+  | 'reviewedBy'
+  | 'actions'
+
+const COLUMN_STORAGE_KEY = 'weightDataVisibleColumns'
+const PAGE_SIZE = 15
+
+const COLUMN_OPTIONS: { key: ColumnKey; label: string; locked?: boolean }[] = [
+  { key: 'project', label: 'Project', locked: true },
+  { key: 'description', label: 'Description', locked: true },
+  { key: 'lenovoPn', label: 'Lenovo PN' },
+  { key: 'customerPn', label: 'MSFT PN' },
+  { key: 'manufacturer', label: 'Manufacturer' },
+  { key: 'category', label: 'Part Category' },
+  { key: 'buildPhase', label: 'Build / Phase' },
+  { key: 'level', label: 'Level' },
+  { key: 'weight', label: 'Weight (kg)' },
+  { key: 'measuredDate', label: 'Measured Date' },
+  { key: 'note', label: 'Note' },
+  { key: 'source', label: 'Source' },
+  { key: 'measuredBy', label: 'Measured By' },
+  { key: 'status', label: 'Status' },
+  { key: 'reviewedBy', label: 'Reviewed By' },
+  { key: 'actions', label: 'Actions' },
+]
+
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
+  'project',
+  'description',
+  'lenovoPn',
+  'category',
+  'level',
+  'weight',
+  'note',
+  'source',
+  'status',
+  'actions',
+]
+
+function loadVisibleColumns(): ColumnKey[] {
+  try {
+    const raw = localStorage.getItem(COLUMN_STORAGE_KEY)
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null
+    if (!Array.isArray(parsed)) return DEFAULT_VISIBLE_COLUMNS
+    const allowed = parsed.filter((key): key is ColumnKey =>
+      COLUMN_OPTIONS.some((option) => option.key === key),
+    )
+    return [...new Set<ColumnKey>(['project', 'description', ...allowed])]
+  } catch {
+    return DEFAULT_VISIBLE_COLUMNS
+  }
+}
 
 export function WeightDataPage() {
   const { projects, records, settings, upsertRecord, deleteRecord, duplicateRecord } = useData()
   const [params] = useSearchParams()
-  const [tab, setTab] = useState<Tab>('All')
   const [query, setQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState(params.get('project') || '')
+  const [levelFilter, setLevelFilter] = useState<Level | ''>('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [buildPhaseFilter, setBuildPhaseFilter] = useState('')
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(loadVisibleColumns)
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<WeightRecord | null>(null)
   const [showForm, setShowForm] = useState(false)
 
@@ -36,7 +104,7 @@ export function WeightDataPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return records
-      .filter((r) => (tab === 'All' ? true : r.level === tab))
+      .filter((r) => (levelFilter ? r.level === levelFilter : true))
       .filter((r) => (projectFilter ? r.projectCode === projectFilter : true))
       .filter((r) => (statusFilter ? r.status === statusFilter : true))
       .filter((r) => (sourceFilter ? r.source === sourceFilter : true))
@@ -61,7 +129,23 @@ export function WeightDataPage() {
           .some((v) => String(v).toLowerCase().includes(q))
       })
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  }, [records, tab, projectFilter, statusFilter, sourceFilter, buildPhaseFilter, query])
+  }, [records, levelFilter, projectFilter, statusFilter, sourceFilter, buildPhaseFilter, query])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageRecords = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+
+  function updateVisibleColumns(next: ColumnKey[]) {
+    const normalized = [...new Set<ColumnKey>(['project', 'description', ...next])]
+    setVisibleColumns(normalized)
+    localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(normalized))
+  }
+
+  function toggleColumn(key: ColumnKey) {
+    if (key === 'project' || key === 'description') return
+    updateVisibleColumns(isVisible(key) ? visibleColumns.filter((column) => column !== key) : [...visibleColumns, key])
+  }
 
   function openAdd() {
     setEditing(null)
@@ -104,26 +188,19 @@ export function WeightDataPage() {
         }
       />
       <div className="content">
-        <div className="tabs">
-          {(['All', ...LEVELS] as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`tab${tab === t ? ' active' : ''}`}
-              onClick={() => setTab(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
         <div className="filter-bar">
           <input
             placeholder="Search description, PN, people, config, supplier…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPage(1)
+            }}
           />
-          <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+          <select value={projectFilter} onChange={(e) => {
+            setProjectFilter(e.target.value)
+            setPage(1)
+          }}>
             <option value="">All projects</option>
             {projects.map((p) => (
               <option key={p.id} value={p.code}>
@@ -131,7 +208,21 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select value={levelFilter} onChange={(e) => {
+            setLevelFilter(e.target.value as Level | '')
+            setPage(1)
+          }}>
+            <option value="">All levels</option>
+            {LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {level}
+              </option>
+            ))}
+          </select>
+          <select value={statusFilter} onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setPage(1)
+          }}>
             <option value="">All statuses</option>
             {RECORD_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -139,7 +230,10 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
-          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+          <select value={sourceFilter} onChange={(e) => {
+            setSourceFilter(e.target.value)
+            setPage(1)
+          }}>
             <option value="">All sources</option>
             {[
               'Internal Measurement',
@@ -153,7 +247,10 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
-          <select value={buildPhaseFilter} onChange={(e) => setBuildPhaseFilter(e.target.value)}>
+          <select value={buildPhaseFilter} onChange={(e) => {
+            setBuildPhaseFilter(e.target.value)
+            setPage(1)
+          }}>
             <option value="">All build / phase</option>
             {buildPhaseOptions.map((s) => (
               <option key={s} value={s}>
@@ -161,6 +258,47 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
+          <div className="columns-menu">
+            <button
+              type="button"
+              className="button secondary columns-trigger"
+              aria-expanded={columnsOpen}
+              onClick={() => setColumnsOpen((open) => !open)}
+            >
+              <Columns3 size={16} /> Columns
+            </button>
+            {columnsOpen ? (
+              <div className="columns-dropdown">
+                <div className="columns-dropdown-head">
+                  <strong>Columns</strong>
+                  <button type="button" className="button ghost" onClick={() => updateVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}>
+                    Reset
+                  </button>
+                </div>
+                <div className="columns-options">
+                  {COLUMN_OPTIONS.map((column) => (
+                    <label key={column.key} className={column.locked ? 'locked-column' : undefined}>
+                      <input
+                        type="checkbox"
+                        checked={isVisible(column.key)}
+                        disabled={column.locked}
+                        onChange={() => toggleColumn(column.key)}
+                      />
+                      {column.label}{column.locked ? ' (always shown)' : ''}
+                    </label>
+                  ))}
+                </div>
+                <div className="columns-dropdown-actions">
+                  <button type="button" className="button secondary" onClick={() => updateVisibleColumns(COLUMN_OPTIONS.map((column) => column.key))}>
+                    Select All
+                  </button>
+                  <button type="button" className="button secondary" onClick={() => updateVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}>
+                    Reset Default
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <span className="muted">{filtered.length} shown</span>
         </div>
 
@@ -169,37 +307,47 @@ export function WeightDataPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Description</th>
-                  <th>Project</th>
-                  <th>Build / Phase</th>
-                  <th>Level</th>
-                  <th>Weight</th>
-                  <th>Source</th>
-                  <th>Measured By</th>
-                  <th>Status</th>
-                  <th>Reviewed By</th>
-                  <th>Actions</th>
+                  {isVisible('project') ? <th className="weight-table-project">Project</th> : null}
+                  {isVisible('description') ? <th className="weight-table-description">Description</th> : null}
+                  {isVisible('lenovoPn') ? <th>Lenovo PN</th> : null}
+                  {isVisible('customerPn') ? <th>MSFT PN</th> : null}
+                  {isVisible('manufacturer') ? <th>Manufacturer</th> : null}
+                  {isVisible('category') ? <th>Part Category</th> : null}
+                  {isVisible('buildPhase') ? <th>Build / Phase</th> : null}
+                  {isVisible('level') ? <th>Level</th> : null}
+                  {isVisible('weight') ? <th>Weight (kg)</th> : null}
+                  {isVisible('measuredDate') ? <th>Measured Date</th> : null}
+                  {isVisible('note') ? <th>Note</th> : null}
+                  {isVisible('source') ? <th>Source</th> : null}
+                  {isVisible('measuredBy') ? <th>Measured By</th> : null}
+                  {isVisible('status') ? <th>Status</th> : null}
+                  {isVisible('reviewedBy') ? <th>Reviewed By</th> : null}
+                  {isVisible('actions') ? <th>Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {pageRecords.map((r) => (
                   <tr key={r.id}>
-                    <td className="description" title={r.description}>
-                      {r.description}
-                    </td>
-                    <td>{r.projectCode}</td>
-                    <td>{r.buildPhase || '—'}</td>
-                    <td>
+                    {isVisible('project') ? <td className="weight-table-project">{r.projectCode || '—'}</td> : null}
+                    {isVisible('description') ? <td className="weight-table-description" title={r.description}>{r.description || '—'}</td> : null}
+                    {isVisible('lenovoPn') ? <td>{r.lenovoPn || '—'}</td> : null}
+                    {isVisible('customerPn') ? <td>{r.customerPn || '—'}</td> : null}
+                    {isVisible('manufacturer') ? <td>{r.manufacturer || '—'}</td> : null}
+                    {isVisible('category') ? <td>{r.category || '—'}</td> : null}
+                    {isVisible('buildPhase') ? <td>{r.buildPhase || '—'}</td> : null}
+                    {isVisible('level') ? <td>
                       <span className="badge level">{r.level}</span>
-                    </td>
-                    <td>{formatWeightKg(r)}</td>
-                    <td>{r.source}</td>
-                    <td>{r.measuredBy || '—'}</td>
-                    <td>
+                    </td> : null}
+                    {isVisible('weight') ? <td>{formatWeightKg(r)}</td> : null}
+                    {isVisible('measuredDate') ? <td>{r.measuredDate || '—'}</td> : null}
+                    {isVisible('note') ? <td className="weight-table-note" title={r.note || undefined}>{r.note || '—'}</td> : null}
+                    {isVisible('source') ? <td>{r.source || '—'}</td> : null}
+                    {isVisible('measuredBy') ? <td>{r.measuredBy || '—'}</td> : null}
+                    {isVisible('status') ? <td>
                       <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
-                    </td>
-                    <td>{r.reviewedBy || '—'}</td>
-                    <td>
+                    </td> : null}
+                    {isVisible('reviewedBy') ? <td>{r.reviewedBy || '—'}</td> : null}
+                    {isVisible('actions') ? <td>
                       <div className="row-actions">
                         {r.status === 'Pending Review' ? (
                           <>
@@ -251,12 +399,12 @@ export function WeightDataPage() {
                           <Trash2 size={15} />
                         </button>
                       </div>
-                    </td>
+                    </td> : null}
                   </tr>
                 ))}
                 {!filtered.length ? (
                   <tr>
-                    <td colSpan={10} className="empty">
+                    <td colSpan={visibleColumns.length} className="empty">
                       No records match the current filters.
                     </td>
                   </tr>
@@ -264,6 +412,22 @@ export function WeightDataPage() {
               </tbody>
             </table>
           </div>
+          {filtered.length ? (
+            <div className="table-pagination">
+              <span className="muted">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} items
+              </span>
+              <div className="pagination-actions">
+                <button type="button" className="button ghost" title="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+                  <ChevronLeft size={16} />
+                </button>
+                <span>{currentPage} / {pageCount}</span>
+                <button type="button" className="button ghost" title="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
