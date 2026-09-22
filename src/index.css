@@ -772,6 +772,81 @@ tr.clickable:hover {
   border-color: #e8b6b6;
 }
 
+.alert.info {
+  background: var(--blue-soft);
+  color: #1e4f7a;
+  border-color: #c4dcf5;
+}
+
+.alert.info,
+.alert.error {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.alert.info p,
+.alert.error p {
+  margin: 4px 0 0;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.settings-main,
+.settings-aside {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.settings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+}
+
+.settings-icon.backup {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.settings-icon.danger {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.settings-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.danger-zone {
+  border-color: #e8b6b6;
+}
+
 .stack {
   display: grid;
   gap: 12px;
@@ -1323,7 +1398,8 @@ tr.clickable:hover {
   .detail-grid,
   .export-layout,
   .dashboard-project-grid,
-  .level-summary-grid {
+  .level-summary-grid,
+  .settings-layout {
     grid-template-columns: 1fr;
   }
   .status-overview-row {
