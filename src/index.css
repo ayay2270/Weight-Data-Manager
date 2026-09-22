@@ -604,6 +604,79 @@ tr.clickable:hover {
   gap: 12px;
 }
 
+.export-primary .export-actions,
+.advanced-body .export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.button-note {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.button.secondary .button-note {
+  background: #edf1f5;
+  color: var(--muted);
+}
+
+.export-includes,
+.tips-panel .tips-list {
+  margin-top: 16px;
+}
+
+.export-includes h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.export-includes ul,
+.tips-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.advanced-panel {
+  padding: 0;
+}
+
+.advanced-panel > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.advanced-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel > summary::before {
+  content: '▸';
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advanced-panel[open] > summary::before {
+  content: '▾';
+}
+
+.advanced-panel .advanced-body {
+  padding: 0 18px 18px;
+  border-top: 1px solid #edf0f3;
+  padding-top: 14px;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
