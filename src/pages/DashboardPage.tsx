@@ -1,61 +1,131 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { Plus, Upload } from 'lucide-react'
-import { LevelProgress } from '../components/LevelProgress'
+  CheckCircle2,
+  Clock3,
+  Database,
+  FolderKanban,
+  Package,
+  Plus,
+  Server,
+  Layers,
+  Box,
+} from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { RecordFormModal } from '../components/RecordFormModal'
+import type { Level, RecordStatus, WeightRecord } from '../data/types'
+import { LEVELS } from '../data/types'
 import { useData } from '../hooks/useData'
 import {
-  collectedByLevel,
-  formatDate,
   formatWeightKg,
-  getWeightKg,
   latestUpdated,
-  overallDataCompleteness,
-  percentLabel,
-  projectCompleteness,
   statusBadgeClass,
+  todayDate,
 } from '../utils/helpers'
+
+const ATTENTION_STATUSES: RecordStatus[] = ['Pending Review', 'Need Recheck']
+const ATTENTION_LIMIT = 8
+const SNAPSHOT_LIMIT = 3
+const RECENT_VERIFIED_LIMIT = 8
+
+const LEVEL_ICONS: Record<Level, typeof Box> = {
+  Part: Box,
+  Node: Layers,
+  Rack: Server,
+  Package: Package,
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return '—'
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  const date = new Date(trimmed)
+  if (Number.isNaN(date.getTime())) {
+    return trimmed.replace('T', ' ').slice(0, 16)
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function countByLevel(records: WeightRecord[]): Record<Level, number> {
+  const counts = { Part: 0, Node: 0, Rack: 0, Package: 0 }
+  for (const record of records) {
+    counts[record.level] += 1
+  }
+  return counts
+}
+
+function countByStatus(records: WeightRecord[]): Partial<Record<RecordStatus, number>> {
+  const counts: Partial<Record<RecordStatus, number>> = {}
+  for (const record of records) {
+    counts[record.status] = (counts[record.status] || 0) + 1
+  }
+  return counts
+}
 
 export function DashboardPage() {
   const { projects, records, settings, upsertRecord } = useData()
   const [showAdd, setShowAdd] = useState(false)
+  const [editing, setEditing] = useState<WeightRecord | null>(null)
 
-  const activeProjects = useMemo(() => projects.filter((p) => p.status === 'Active'), [projects])
-  const completeness = overallDataCompleteness({
-    version: 1,
-    projects,
-    records,
-    settings,
-  })
   const lastUpdated = latestUpdated({ version: 1, projects, records, settings })
+  const pendingReviewCount = records.filter((r) => r.status === 'Pending Review').length
+  const verifiedCount = records.filter((r) => r.status === 'Verified').length
 
-  const distribution = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const r of records) {
-      const weightKg = getWeightKg(r)
-      if (weightKg == null) continue
-      map.set(r.level, (map.get(r.level) || 0) + weightKg)
-    }
-    return ['Part', 'Node', 'Rack', 'Package'].map((level) => ({
-      level,
-      kg: Number((map.get(level) || 0).toFixed(2)),
-    }))
+  const attentionRecords = useMemo(() => {
+    const rank = (status: RecordStatus) => (status === 'Need Recheck' ? 0 : 1)
+    return [...records]
+      .filter((r) => ATTENTION_STATUSES.includes(r.status))
+      .sort((a, b) => {
+        const byStatus = rank(a.status) - rank(b.status)
+        if (byStatus !== 0) return byStatus
+        return b.updatedAt.localeCompare(a.updatedAt)
+      })
+      .slice(0, ATTENTION_LIMIT)
   }, [records])
 
-  const recent = useMemo(
-    () => [...records].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8),
-    [records],
-  )
+  const snapshotProjects = useMemo(() => {
+    const active = projects.filter((p) => p.status === 'Active')
+    const source = active.length ? active : projects
+    return [...source]
+      .sort((a, b) => {
+        const aCount = records.filter((r) => r.projectId === a.id).length
+        const bCount = records.filter((r) => r.projectId === b.id).length
+        if (bCount !== aCount) return bCount - aCount
+        return a.code.localeCompare(b.code)
+      })
+      .slice(0, SNAPSHOT_LIMIT)
+  }, [projects, records])
+
+  const recentVerified = useMemo(() => {
+    return [...records]
+      .filter((r) => r.status === 'Verified')
+      .sort((a, b) => {
+        const aKey = a.reviewedDate || a.updatedAt
+        const bKey = b.reviewedDate || b.updatedAt
+        return bKey.localeCompare(aKey)
+      })
+      .slice(0, RECENT_VERIFIED_LIMIT)
+  }, [records])
+
+  function openEdit(record: WeightRecord) {
+    setEditing(record)
+  }
+
+  function applyVerify(record: WeightRecord) {
+    const reviewedBy = window.prompt('Reviewed By (required for Verified):', record.reviewedBy || '')
+    if (reviewedBy == null) return
+    if (!reviewedBy.trim()) {
+      window.alert('Reviewed By is required when Status is Verified.')
+      return
+    }
+    upsertRecord({
+      ...record,
+      status: 'Verified',
+      reviewedBy: reviewedBy.trim(),
+      reviewedDate: record.reviewedDate || todayDate(),
+    })
+  }
 
   return (
     <>
@@ -63,161 +133,255 @@ export function DashboardPage() {
         title="Weight Data Manager"
         subtitle="Track Part / Node / Rack / Package weight collection across engineering projects."
         actions={
-          <>
-            <button type="button" className="button" onClick={() => setShowAdd(true)}>
-              <Plus size={16} /> Add Record
-            </button>
-            <Link className="button secondary" to="/import-export">
-              <Upload size={16} /> Import Data
-            </Link>
-          </>
+          <button type="button" className="button" onClick={() => setShowAdd(true)}>
+            <Plus size={16} /> Add Record
+          </button>
         }
       />
+
       <div className="content">
-        <div className="cards">
-          <div className="card blue">
-            <span>Active Projects</span>
-            <strong>{activeProjects.length}</strong>
+        <div className="cards dashboard-summary-cards">
+          <div className="card blue dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <FolderKanban size={18} />
+            </div>
+            <div>
+              <span>Projects</span>
+              <strong>{projects.length}</strong>
+            </div>
           </div>
-          <div className="card green">
-            <span>Weight Records</span>
-            <strong>{records.length}</strong>
+          <div className="card slate dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <Database size={18} />
+            </div>
+            <div>
+              <span>Total Records</span>
+              <strong>{records.length}</strong>
+            </div>
           </div>
-          <div className="card amber">
-            <span>Data Completeness</span>
-            <strong>{percentLabel(completeness)}</strong>
-            <em>Collected ÷ Expected</em>
+          <div className="card amber dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <Clock3 size={18} />
+            </div>
+            <div>
+              <span>Pending Review</span>
+              <strong>{pendingReviewCount}</strong>
+            </div>
           </div>
-          <div className="card slate">
-            <span>Last Updated</span>
-            <strong style={{ fontSize: 20 }}>{formatDate(lastUpdated)}</strong>
-            <em>{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—'}</em>
+          <div className="card green dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <CheckCircle2 size={18} />
+            </div>
+            <div>
+              <span>Verified</span>
+              <strong>{verifiedCount}</strong>
+            </div>
+          </div>
+        </div>
+        <div className="dashboard-last-updated muted">
+          Last updated: {formatDateTime(lastUpdated)}
+        </div>
+
+        <div className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>Records Requiring Attention</h2>
+              <p>Items waiting for engineer review or recheck.</p>
+            </div>
+            <Link className="button ghost" to="/weight-data">
+              View all records →
+            </Link>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Description</th>
+                  <th>Build / Phase</th>
+                  <th>Weight</th>
+                  <th>Measured By</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attentionRecords.map((r) => (
+                  <tr key={r.id}>
+                    <td className="weight-table-project">{r.projectCode || '—'}</td>
+                    <td className="description" title={r.description}>
+                      {r.description || '—'}
+                    </td>
+                    <td>{r.buildPhase || '—'}</td>
+                    <td>{formatWeightKg(r)}</td>
+                    <td>{r.measuredBy || '—'}</td>
+                    <td>
+                      <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
+                    </td>
+                    <td>
+                      <div className="dashboard-row-actions">
+                        {r.status === 'Pending Review' ? (
+                          <>
+                            <button type="button" className="button ghost" onClick={() => applyVerify(r)}>
+                              Verify
+                            </button>
+                            <button type="button" className="button ghost" onClick={() => openEdit(r)}>
+                              Review
+                            </button>
+                          </>
+                        ) : (
+                          <button type="button" className="button ghost" onClick={() => openEdit(r)}>
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!attentionRecords.length ? (
+                  <tr>
+                    <td colSpan={7} className="empty">
+                      No records need attention.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
         </div>
 
         <div className="panel">
           <div className="panel-head">
             <div>
-              <h2>Project Data Collection Progress</h2>
-              <p>Part / Node / Rack / Package bars — completeness uses each project&apos;s expected item targets.</p>
+              <h2>Project Snapshot</h2>
+              <p>Current record counts by level and review status.</p>
             </div>
+            <Link className="button ghost" to="/projects">
+              View all projects →
+            </Link>
           </div>
-          <div className="project-progress-grid">
-            {activeProjects.map((project) => {
+          <div className="dashboard-project-grid">
+            {snapshotProjects.map((project) => {
               const projectRecords = records.filter((r) => r.projectId === project.id)
-              const { collected } = projectCompleteness(project.expectedItems, projectRecords)
+              const byLevel = countByLevel(projectRecords)
+              const byStatus = countByStatus(projectRecords)
+              const statusRows: Array<{ status: RecordStatus; className: string }> = [
+                { status: 'Pending Review', className: 'pending' },
+                { status: 'Verified', className: 'verified' },
+                { status: 'Need Recheck', className: 'recheck' },
+              ]
+
               return (
-                <div key={project.id} className="panel" style={{ marginBottom: 0, boxShadow: 'none' }}>
-                  <LevelProgress
-                    title={`${project.code} · ${project.name}`}
-                    subtitle={`${project.phase || 'No phase'} · ${projectRecords.length} records`}
-                    expected={project.expectedItems}
-                    collected={collected}
-                  />
-                  <div style={{ marginTop: 10 }}>
-                    <Link className="button ghost" to={`/projects/${project.id}`}>
-                      Open project →
-                    </Link>
+                <div key={project.id} className="dashboard-project-card">
+                  <div className="dashboard-project-card-head">
+                    <strong>
+                      {project.code} · {project.name}
+                    </strong>
+                    <span className="muted">Phase: {project.phase || '—'}</span>
+                  </div>
+
+                  <div className="dashboard-level-grid">
+                    {LEVELS.map((level) => {
+                      const Icon = LEVEL_ICONS[level]
+                      return (
+                        <div key={level} className="dashboard-level-item">
+                          <Icon size={15} />
+                          <div>
+                            <span>{level}</span>
+                            <strong>{byLevel[level]} records</strong>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="dashboard-project-card-foot">
+                    <div>
+                      <div className="dashboard-total">Total {projectRecords.length} records</div>
+                      <Link className="button ghost" to={`/projects/${project.id}`}>
+                        Open project →
+                      </Link>
+                    </div>
+                    <ul className="dashboard-status-list">
+                      {statusRows.map(({ status, className }) => {
+                        const count = byStatus[status] || 0
+                        if (!count) return null
+                        return (
+                          <li key={status} className={className}>
+                            <span>{status}</span>
+                            <strong>{count}</strong>
+                          </li>
+                        )
+                      })}
+                    </ul>
                   </div>
                 </div>
               )
             })}
-            {!activeProjects.length ? <div className="empty">No active projects.</div> : null}
-          </div>
-        </div>
-
-        <div className="grid-2">
-          <div className="panel">
-            <div className="panel-head">
-              <h2>Weight Distribution</h2>
-              <p>Total measured mass by level (kg)</p>
-            </div>
-            <div style={{ width: '100%', height: 280 }}>
-              <ResponsiveContainer>
-                <BarChart data={distribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5eaf0" />
-                  <XAxis dataKey="level" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="kg" fill="#2563a6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-head">
-              <h2>Recent Weight Records</h2>
-              <Link className="button ghost" to="/weight-data">
-                View all
-              </Link>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Project</th>
-                    <th>Level</th>
-                    <th>Description</th>
-                    <th>Weight (kg)</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recent.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.projectCode}</td>
-                      <td>
-                        <span className="badge level">{r.level}</span>
-                      </td>
-                      <td className="description" title={r.description}>
-                        {r.description}
-                      </td>
-                      <td>{formatWeightKg(r)}</td>
-                      <td>
-                        <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                  {!recent.length ? (
-                    <tr>
-                      <td colSpan={5} className="empty">
-                        No records yet.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
+            {!snapshotProjects.length ? <div className="empty">No projects yet.</div> : null}
           </div>
         </div>
 
         <div className="panel">
           <div className="panel-head">
-            <h2>Portfolio Level Snapshot</h2>
-            <p>Collected vs expected across all active projects</p>
+            <div>
+              <h2>Recent Verified Records</h2>
+              <p>Latest records that completed engineer review.</p>
+            </div>
+            <Link className="button ghost" to="/weight-data">
+              View all →
+            </Link>
           </div>
-          <LevelProgress
-            expected={activeProjects.reduce(
-              (acc, p) => ({
-                Part: acc.Part + p.expectedItems.Part,
-                Node: acc.Node + p.expectedItems.Node,
-                Rack: acc.Rack + p.expectedItems.Rack,
-                Package: acc.Package + p.expectedItems.Package,
-              }),
-              { Part: 0, Node: 0, Rack: 0, Package: 0 },
-            )}
-            collected={collectedByLevel(records.filter((r) => activeProjects.some((p) => p.id === r.projectId)))}
-          />
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Description</th>
+                  <th>Project</th>
+                  <th>Weight</th>
+                  <th>Reviewer</th>
+                  <th>Verified At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentVerified.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
+                    </td>
+                    <td className="description" title={r.description}>
+                      {r.description || '—'}
+                    </td>
+                    <td>{r.projectCode || '—'}</td>
+                    <td>{formatWeightKg(r)}</td>
+                    <td>{r.reviewedBy || '—'}</td>
+                    <td>{formatDateTime(r.reviewedDate || r.updatedAt)}</td>
+                  </tr>
+                ))}
+                {!recentVerified.length ? (
+                  <tr>
+                    <td colSpan={6} className="empty">
+                      No verified records yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <RecordFormModal
-        open={showAdd}
+        open={showAdd || Boolean(editing)}
         projects={projects}
+        initial={editing}
         defaultProjectId={settings.defaultProjectId}
         defaultUnit={settings.defaultUnit}
-        onClose={() => setShowAdd(false)}
+        onClose={() => {
+          setShowAdd(false)
+          setEditing(null)
+        }}
         onSave={upsertRecord}
       />
     </>
