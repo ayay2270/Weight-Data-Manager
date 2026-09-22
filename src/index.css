@@ -604,16 +604,119 @@ tr.clickable:hover {
   gap: 12px;
 }
 
-.export-primary .export-actions,
-.advanced-body .export-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
+.export-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.4fr) minmax(260px, 0.9fr);
+  gap: 18px;
+  align-items: start;
 }
 
-.button-note {
-  margin-left: 8px;
+.export-main,
+.export-side {
+  min-width: 0;
+}
+
+.export-card-head {
+  margin-bottom: 10px;
+}
+
+.section-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.section-title-icon {
+  color: var(--blue);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.section-title-icon.tips {
+  color: var(--amber);
+}
+
+.section-title h2 {
+  margin: 0;
+}
+
+.section-title small,
+.advanced-summary-main small {
+  display: block;
+  margin-top: 2px;
+}
+
+.export-intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+  max-width: 62ch;
+}
+
+.export-option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.export-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  border-radius: 8px;
+  padding: 16px 14px;
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+  min-height: 92px;
+  position: relative;
+}
+
+.export-option-primary {
+  background: var(--green);
+  border: 1px solid var(--green);
+  color: #fff;
+}
+
+.export-option-primary:hover {
+  filter: brightness(0.97);
+}
+
+.export-option-secondary {
+  background: #fff;
+  border: 1px solid #cbd5df;
+  color: #334155;
+}
+
+.export-option-secondary:hover {
+  background: #f8fafc;
+}
+
+.export-option-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.export-option-body strong {
+  font-size: 14px;
+}
+
+.export-option-body small {
+  color: inherit;
+  opacity: 0.88;
+  line-height: 1.35;
+}
+
+.export-option-secondary .export-option-body small {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.export-option-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.22);
@@ -621,22 +724,21 @@ tr.clickable:hover {
   font-weight: 600;
 }
 
-.button.secondary .button-note {
-  background: #edf1f5;
-  color: var(--muted);
-}
-
-.export-includes,
-.tips-panel .tips-list {
+.export-includes-panel {
   margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  border: 1px solid #d7e6f6;
 }
 
-.export-includes h3 {
+.export-includes-panel h3 {
   margin: 0 0 8px;
   font-size: 14px;
+  color: var(--blue);
 }
 
-.export-includes ul,
+.export-includes-panel ul,
 .tips-list {
   margin: 0;
   padding-left: 18px;
@@ -644,8 +746,18 @@ tr.clickable:hover {
   line-height: 1.55;
 }
 
+.export-includes-panel li {
+  color: var(--text);
+}
+
+.tips-panel .panel-head {
+  margin-bottom: 10px;
+}
+
 .advanced-panel {
   padding: 0;
+  position: sticky;
+  top: 18px;
 }
 
 .advanced-panel > summary {
@@ -654,27 +766,51 @@ tr.clickable:hover {
   padding: 16px 18px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .advanced-panel > summary::-webkit-details-marker {
   display: none;
 }
 
-.advanced-panel > summary::before {
-  content: '▸';
-  color: var(--muted);
-  font-size: 12px;
+.advanced-summary-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-.advanced-panel[open] > summary::before {
+.advanced-summary-main strong {
+  display: block;
+}
+
+.advanced-panel > summary::after {
   content: '▾';
+  color: var(--muted);
+  font-size: 12px;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.advanced-panel[open] > summary::after {
+  transform: rotate(0deg);
 }
 
 .advanced-panel .advanced-body {
   padding: 0 18px 18px;
   border-top: 1px solid #edf0f3;
   padding-top: 14px;
+}
+
+.advanced-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.advanced-actions .button {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
 }
 
 .detail-grid {
@@ -741,8 +877,12 @@ tr.clickable:hover {
   }
   .grid-2,
   .grid-3,
-  .detail-grid {
+  .detail-grid,
+  .export-layout {
     grid-template-columns: 1fr;
+  }
+  .advanced-panel {
+    position: static;
   }
 }
 
@@ -755,5 +895,8 @@ tr.clickable:hover {
   }
   .span-2 {
     grid-column: auto;
+  }
+  .export-option-grid {
+    grid-template-columns: 1fr;
   }
 }

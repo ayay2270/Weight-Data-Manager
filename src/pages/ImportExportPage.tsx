@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Download, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, Lightbulb, Settings2, Upload } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
 import { downloadBlob } from '../utils/helpers'
@@ -65,89 +65,122 @@ export function ImportExportPage() {
   return (
     <>
       <PageHeader
-        title="Import / Export"
+        title="Export"
         subtitle="Export the current local database to Excel or CSV for backup, analysis, or sharing."
       />
       <div className="content">
         {message ? <div className="alert success">{message}</div> : null}
         {error ? <div className="alert error">{error}</div> : null}
 
-        <div className="panel export-primary">
-          <div className="panel-head">
-            <h2>Export</h2>
-            <p>Current LocalStorage database · {data.records.length} records</p>
-          </div>
-          <div className="export-actions">
-            <button type="button" className="button" onClick={exportExcel}>
-              <Download size={16} /> Export to Excel (.xlsx)
-              <span className="button-note">Recommended</span>
-            </button>
-            <button type="button" className="button secondary" onClick={exportCsvFile}>
-              <Download size={16} /> Export to CSV (.csv)
-            </button>
-          </div>
-          <div className="export-includes">
-            <h3>Exported Data Includes</h3>
-            <ul>
-              <li>All weight records with complete information</li>
-              <li>Project / Build / Phase</li>
-              <li>Configuration / Included Items</li>
-              <li>Source / Supplier / Reference</li>
-              <li>Measured By / Reviewed By</li>
-              <li>Status</li>
-              <li>Normalized Weight in kg</li>
-            </ul>
-          </div>
-        </div>
+        <div className="export-layout">
+          <div className="export-main">
+            <div className="panel export-card">
+              <div className="panel-head export-card-head">
+                <div className="section-title">
+                  <Download size={18} className="section-title-icon" />
+                  <div>
+                    <h2>Export</h2>
+                    <p>Current LocalStorage database · {data.records.length} records</p>
+                  </div>
+                </div>
+              </div>
+              <p className="export-intro">
+                Export the current weight database to Excel or CSV format. The exported file can be used for backup,
+                analysis, or sharing.
+              </p>
 
-        <div className="panel tips-panel">
-          <div className="panel-head">
-            <h2>Tips</h2>
-          </div>
-          <ul className="tips-list">
-            <li>Use Export to create a backup of local data.</li>
-            <li>Exported files can be used for analysis or reporting.</li>
-            <li>For normal data collection, add records directly through Weight Data Manager.</li>
-            <li>Import is intended mainly for legacy data migration / maintenance.</li>
-          </ul>
-        </div>
+              <div className="export-option-grid">
+                <button type="button" className="export-option export-option-primary" onClick={exportExcel}>
+                  <FileSpreadsheet size={22} />
+                  <span className="export-option-body">
+                    <strong>Export to Excel (.xlsx)</strong>
+                    <small>Recommended format with multiple sheets</small>
+                  </span>
+                  <span className="export-option-badge">Recommended</span>
+                </button>
+                <button type="button" className="export-option export-option-secondary" onClick={exportCsvFile}>
+                  <FileText size={22} />
+                  <span className="export-option-body">
+                    <strong>Export to CSV (.csv)</strong>
+                    <small>Flat file format / single sheet</small>
+                  </span>
+                </button>
+              </div>
 
-        <details className="panel advanced-panel">
-          <summary>
-            <span>
-              <strong>Advanced / Maintenance</strong>
-              <span className="muted"> Legacy Excel / CSV import · default collapsed</span>
-            </span>
-          </summary>
-          <div className="stack advanced-body">
-            <p className="muted">For maintenance / legacy data migration only.</p>
-            <p className="muted">
-              Existing X01 Excel and CSV files are normalized automatically during import. Excel sheets Part Level /
-              Node Level / Rack Level / Package remain supported.
-            </p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-              disabled={busy}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) void handleFile(file)
-              }}
-            />
-            <div className="export-actions">
-              <button type="button" className="button secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
-                <Upload size={16} /> {busy ? 'Importing…' : 'Choose file to import'}
-              </button>
-              <a
-                className="button secondary"
-                href={`${import.meta.env.BASE_URL}sample/Weight_Measurement_Record_X01.xlsx`}
-              >
-                <Download size={16} /> Download sample X01 Excel
-              </a>
+              <div className="export-includes-panel">
+                <h3>Exported Data Includes</h3>
+                <ul>
+                  <li>All weight records with complete information</li>
+                  <li>Project / Build / Phase · Configuration / Included Items</li>
+                  <li>Source / Supplier / Reference · Measured By / Reviewed By · Status</li>
+                  <li>Normalized Weight in kg</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="panel tips-panel">
+              <div className="panel-head">
+                <div className="section-title">
+                  <Lightbulb size={18} className="section-title-icon tips" />
+                  <h2>Tips</h2>
+                </div>
+              </div>
+              <ul className="tips-list">
+                <li>Use export to create a backup of your local data.</li>
+                <li>Exported files can be used for analysis or reporting.</li>
+                <li>For normal data collection, add records directly through Weight Data Manager.</li>
+                <li>Import is intended mainly for legacy data migration / maintenance.</li>
+              </ul>
             </div>
           </div>
-        </details>
+
+          <aside className="export-side">
+            <details className="panel advanced-panel">
+              <summary>
+                <span className="advanced-summary-main">
+                  <Settings2 size={16} />
+                  <span>
+                    <strong>Advanced / Maintenance</strong>
+                    <small className="muted">Excel / CSV Import</small>
+                  </span>
+                </span>
+              </summary>
+              <div className="stack advanced-body">
+                <p className="muted">For maintenance / legacy data migration only.</p>
+                <p className="muted">
+                  Existing X01 Excel and CSV files are normalized automatically during import. Excel sheets Part Level /
+                  Node Level / Rack Level / Package remain supported.
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleFile(file)
+                  }}
+                />
+                <div className="advanced-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <Upload size={16} /> {busy ? 'Importing…' : 'Choose file to import'}
+                  </button>
+                  <a
+                    className="button secondary"
+                    href={`${import.meta.env.BASE_URL}sample/Weight_Measurement_Record_X01.xlsx`}
+                  >
+                    <Download size={16} /> Download sample X01 Excel
+                  </a>
+                </div>
+              </div>
+            </details>
+          </aside>
+        </div>
       </div>
     </>
   )
