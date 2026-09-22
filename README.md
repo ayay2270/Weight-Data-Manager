@@ -87,19 +87,30 @@ If `weight_manager.db-wal` or `weight_manager.db-shm` remains after shutdown, as
 - Details and log path: click **Show Details**.
 - Port 8000 must be free.
 
-## Development and rebuild (maintainers only)
+## Official Windows build (maintainers)
 
-Department Host PC users never use these steps. They only run `Weight Data Manager.exe`.
+Normal department use does **not** need local Python. The official Windows EXE is produced by GitHub Actions.
 
-**Sole Windows build entry:** on a build machine with Python 3.11+ on PATH, run:
+1. Push to `main`, or open **Actions** → **Build Windows** → **Run workflow**.
+2. Wait for the latest successful run.
+3. Open the run → **Artifacts** → download **Weight-Data-Manager-Windows**.
+4. Unpack `Weight-Data-Manager-Windows.zip` and deploy the `Weight Data Manager` folder to the Host PC.
+
+Department users only double-click `Weight Data Manager.exe`. First-launch firewall setup (if needed) runs inside that EXE via UAC — there is no separate setup EXE and no Python/BAT/PowerShell/CMD for daily use.
+
+## Local rebuild (optional maintainers only)
+
+Department Host PC users never use these steps.
+
+**Sole local Windows build entry** (build machine with Python 3.11+ on PATH):
 
 ```text
 build_release.bat
 ```
 
-That script checks for Python, creates `.venv`, installs requirements + PyInstaller, and builds `dist\Weight Data Manager\`. If Python is missing it prints **BUILD FAILED**, exits with a non-zero code, and does not claim success.
+That script checks for Python, creates `.venv`, installs requirements + PyInstaller, and builds `dist\Weight Data Manager\`. If Python is missing it prints **BUILD FAILED**, exits non-zero, and does not claim success. It runs non-interactively (suitable for CI).
 
-Optional maintainer checks after a successful build (requires the `.venv` from `build_release.bat`):
+Optional maintainer checks after a successful local build (requires the `.venv` from `build_release.bat`):
 
 ```text
 run_tests.bat
@@ -111,6 +122,6 @@ Developer server without the Tk launcher (maintainer Python checkout only):
 .venv\Scripts\python.exe start_server.py
 ```
 
-Windows is required to produce the release EXE. On Linux CI or Cloud Agent hosts, run `pytest` in a venv and rebuild the EXE later on a Windows build machine.
+Prefer the GitHub Actions artifact for department deployment. Local `build_release.bat` is for maintainers who need an offline rebuild.
 
 Version 1 intentionally does not include login, SSO, roles, Docker, cloud deployment, Teams/email notification, PLM/BOM integration, or CAE calculations.

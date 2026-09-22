@@ -8,6 +8,31 @@ echo.
 
 rem --- Locate Python (build machine requirement) ---
 set "PYEXE="
+
+rem GitHub Actions / CI: prefer the setup-python "python" on PATH
+if defined GITHUB_ACTIONS goto use_ci_python
+if /I "%CI%"=="true" goto use_ci_python
+goto find_python
+
+:use_ci_python
+where python >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo BUILD FAILED: GITHUB_ACTIONS/CI is set but python was not found on PATH.
+  echo.
+  exit /b 1
+)
+python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo BUILD FAILED: CI Python must be 3.11 or newer.
+  echo.
+  exit /b 1
+)
+set "PYEXE=python"
+goto python_ready
+
+:find_python
 where py >nul 2>&1
 if not errorlevel 1 (
   py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
@@ -38,6 +63,8 @@ if not defined PYEXE (
   echo.
   exit /b 1
 )
+
+:python_ready
 
 echo Using Python: %PYEXE%
 %PYEXE% -c "import sys; print(sys.version)"

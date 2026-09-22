@@ -1,0 +1,82 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Windows EXE release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requirements and PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller==6.11.1
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build release (build_release.bat)
+        env:
+          GITHUB_ACTIONS: "true"
+        run: build_release.bat
+
+      - name: Verify release folder
+        shell: pwsh
+        run: |
+          $release = "dist\Weight Data Manager"
+          $required = @(
+            "$release\Weight Data Manager.exe",
+            "$release\README.md",
+            "$release\_internal"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Missing required release path: $path"
+            }
+          }
+          $forbidden = @(
+            "$release\First Time Setup.exe",
+            "$release\setup_server.bat",
+            "$release\start_server.bat",
+            "$release\backup_database.bat"
+          )
+          foreach ($path in $forbidden) {
+            if (Test-Path $path) {
+              throw "Forbidden file present in release: $path"
+            }
+          }
+          Write-Host "Release folder verified."
+          Get-ChildItem $release | Format-Table Name, Length
+
+      - name: Zip release folder
+        shell: pwsh
+        run: |
+          if (Test-Path "Weight-Data-Manager-Windows.zip") {
+            Remove-Item "Weight-Data-Manager-Windows.zip" -Force
+          }
+          Compress-Archive -Path "dist\Weight Data Manager" -DestinationPath "Weight-Data-Manager-Windows.zip"
+          Get-Item "Weight-Data-Manager-Windows.zip" | Format-List Name, Length, FullName
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Weight-Data-Manager-Windows
+          path: Weight-Data-Manager-Windows.zip
+          if-no-files-found: error
