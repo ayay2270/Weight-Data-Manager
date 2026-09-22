@@ -2,4 +2,4 @@
 
 See [README.md](README.md).
 
-Department users only need `Weight Data Manager.exe` from the release folder. Maintainers rebuild with `build_release.bat` on a Windows build machine that has Python 3.11+.
+Department users only need `Weight Data Manager.exe` from the release folder (or the **Weight-Data-Manager-Windows** GitHub Actions artifact). Maintainers: **Actions → Build Windows → Run workflow**.
