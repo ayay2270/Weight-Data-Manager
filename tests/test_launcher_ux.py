@@ -64,10 +64,14 @@ def test_daily_backup_same_day_no_duplicate_and_prune(tmp_path, monkeypatch):
     data_dir.mkdir()
     backup_dir.mkdir()
     db_path = data_dir / "weight_manager.db"
-    with sqlite3.connect(db_path) as db:
+    # Explicit close: on Windows, sqlite3 context managers do not always unlock files (Py 3.11).
+    db = sqlite3.connect(db_path)
+    try:
         db.execute("CREATE TABLE t(id INTEGER PRIMARY KEY)")
         db.execute("INSERT INTO t(id) VALUES (1)")
         db.commit()
+    finally:
+        db.close()
 
     import app.config as config
     import app.launch_backup as launch_backup
@@ -84,16 +88,20 @@ def test_daily_backup_same_day_no_duplicate_and_prune(tmp_path, monkeypatch):
 
     first = backup_if_due(keep=30)
     assert first is not None and first.exists()
-    with sqlite3.connect(first) as check:
+    check = sqlite3.connect(first)
+    try:
         assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        check.close()
 
     second = backup_if_due(keep=30)
     assert second is None
     assert len(list(backup_dir.glob("weight_manager_*.db"))) == 1
 
+    payload = first.read_bytes()
     for index in range(5):
         extra = backup_dir / f"weight_manager_2099-01-0{index + 1}_000000.db"
-        extra.write_bytes(first.read_bytes())
+        extra.write_bytes(payload)
     prune_backups(keep=2)
     assert len(list(backup_dir.glob("weight_manager_*.db"))) == 2
 

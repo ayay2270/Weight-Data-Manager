@@ -46,6 +46,18 @@ def backup_if_due(keep=30):
 
 
 def prune_backups(keep=30):
+    import time
+
     backups = sorted(BACKUP_DIR.glob("weight_manager_*.db"), key=lambda path: path.stat().st_mtime, reverse=True)
     for stale in backups[keep:]:
-        stale.unlink()
+        last_error = None
+        for attempt in range(5):
+            try:
+                stale.unlink()
+                last_error = None
+                break
+            except PermissionError as exc:  # WinError 32: file still briefly locked
+                last_error = exc
+                time.sleep(0.05 * (attempt + 1))
+        if last_error is not None:
+            raise last_error
