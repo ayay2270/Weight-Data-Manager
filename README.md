@@ -68,9 +68,15 @@ Preview server: [http://127.0.0.1:43123/Weight-Data-Manager/](http://127.0.0.1:4
 
 ## Deployment (GitHub Pages)
 
-- Branch: `main`
-- Workflow: `.github/workflows/deploy-pages.yml`
-- Site is published from the Vite `dist/` output with base `/Weight-Data-Manager/`
+- Source branch: `gh-pages` (built `dist/` with base `/Weight-Data-Manager/`)
+- After local `npm run build`, publish with:
+
+```bash
+npm run build
+npx --yes gh-pages -d dist -b gh-pages
+```
+
+- Or push the contents of `dist/` to the `gh-pages` branch manually.
 
 ## URLs
 
