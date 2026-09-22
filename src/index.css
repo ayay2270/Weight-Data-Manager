@@ -1,5 +1,5 @@
 :root {
-  --navy: #17243a;
+  --navy: #16263d;
   --navy-2: #22324d;
   --blue: #2563a6;
   --blue-soft: #eaf2fb;
@@ -15,7 +15,7 @@
   --red: #a23a3a;
   --red-bg: #fcecec;
   --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --sidebar: 230px;
+  --sidebar: 252px;
   font-family: 'Segoe UI', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -60,30 +60,30 @@ textarea {
   inset: 0 auto 0 0;
   width: var(--sidebar);
   background: var(--navy);
-  color: #d8e1ed;
+  color: #e8eef6;
   display: flex;
   flex-direction: column;
-  padding: 22px 16px;
+  padding: 20px 14px;
   z-index: 20;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 8px 24px;
+  gap: 10px;
+  padding: 2px 6px 22px;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #6680a3;
-  border-radius: 8px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
+.brand-logo {
+  display: block;
+  width: 58px;
+  height: auto;
+  flex: 0 0 auto;
+  border-radius: 2px;
+}
+
+.brand-copy {
+  min-width: 0;
 }
 
 .brand strong,
@@ -91,9 +91,19 @@ textarea {
   display: block;
 }
 
+.brand strong {
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
 .brand small {
-  color: #96a8c0;
+  color: #a7b7cc;
   font-size: 11px;
+  line-height: 1.3;
+  margin-top: 2px;
 }
 
 .sidebar nav {
@@ -105,7 +115,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #cbd7e6;
+  color: #d5deea;
   padding: 10px 12px;
   border-radius: 7px;
 }
@@ -1219,7 +1229,13 @@ tr.clickable:hover {
 
 @media (max-width: 900px) {
   :root {
-    --sidebar: 200px;
+    --sidebar: 220px;
+  }
+  .brand-logo {
+    width: 52px;
+  }
+  .brand strong {
+    font-size: 12px;
   }
   .form-grid {
     grid-template-columns: 1fr;

@@ -19,8 +19,14 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">WDM</div>
-        <div>
+        <img
+          className="brand-logo"
+          src={`${import.meta.env.BASE_URL}lenovo-logo.svg`}
+          alt="Lenovo"
+          width={58}
+          height={16}
+        />
+        <div className="brand-copy">
           <strong>Weight Data Manager</strong>
           <small>Engineering weight database</small>
         </div>
