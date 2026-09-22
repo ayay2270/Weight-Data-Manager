@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { RecordFormModal } from '../components/RecordFormModal'
+import { ReviewRecordModal } from '../components/ReviewRecordModal'
 import type { Level, RecordStatus, WeightRecord } from '../data/types'
 import { LEVELS } from '../data/types'
 import { useData } from '../hooks/useData'
@@ -20,7 +21,6 @@ import {
   formatWeightKg,
   latestUpdated,
   statusBadgeClass,
-  todayDate,
 } from '../utils/helpers'
 
 const ATTENTION_STATUSES: RecordStatus[] = ['Pending Review', 'Need Recheck']
@@ -67,6 +67,7 @@ export function DashboardPage() {
   const { projects, records, settings, upsertRecord } = useData()
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState<WeightRecord | null>(null)
+  const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
 
   const lastUpdated = latestUpdated({ version: 1, projects, records, settings })
   const pendingReviewCount = records.filter((r) => r.status === 'Pending Review').length
@@ -110,21 +111,6 @@ export function DashboardPage() {
 
   function openEdit(record: WeightRecord) {
     setEditing(record)
-  }
-
-  function applyVerify(record: WeightRecord) {
-    const reviewedBy = window.prompt('Reviewed By (required for Verified):', record.reviewedBy || '')
-    if (reviewedBy == null) return
-    if (!reviewedBy.trim()) {
-      window.alert('Reviewed By is required when Status is Verified.')
-      return
-    }
-    upsertRecord({
-      ...record,
-      status: 'Verified',
-      reviewedBy: reviewedBy.trim(),
-      reviewedDate: record.reviewedDate || todayDate(),
-    })
   }
 
   return (
@@ -222,7 +208,7 @@ export function DashboardPage() {
                       <div className="dashboard-row-actions">
                         {r.status === 'Pending Review' ? (
                           <>
-                            <button type="button" className="button ghost" onClick={() => applyVerify(r)}>
+                            <button type="button" className="button ghost" onClick={() => setReviewing(r)}>
                               Verify
                             </button>
                             <button type="button" className="button ghost" onClick={() => openEdit(r)}>
@@ -384,6 +370,7 @@ export function DashboardPage() {
         }}
         onSave={upsertRecord}
       />
+      <ReviewRecordModal key={reviewing?.id || 'none'} record={reviewing} onClose={() => setReviewing(null)} onSave={upsertRecord} />
     </>
   )
 }
