@@ -1,6 +1,14 @@
 import * as XLSX from 'xlsx'
 import type { AppData, DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
-import { cleanText, getWeightKg, nowIso, toWeightKg, uid } from './helpers'
+import {
+  cleanText,
+  getWeightKg,
+  migrateRecordStatus,
+  normalizeDataSource,
+  nowIso,
+  toWeightKg,
+  uid,
+} from './helpers'
 
 const LEVEL_SHEETS: { level: Level; names: string[]; defaultUnit: WeightUnit }[] = [
   { level: 'Part', names: ['Part Level', 'Part'], defaultUnit: 'g' },
@@ -17,37 +25,37 @@ function parseWeight(
   const supplied = cleanText(suppliedUnit)?.toLowerCase()
   const inputUnit: WeightUnit = supplied === 'g' ? 'g' : supplied === 'kg' ? 'kg' : defaultUnit
   if (raw == null || raw === '') {
-    return { value: null, unit: inputUnit, status: 'Missing', original: null, source: 'Unknown' }
+    return { value: null, unit: inputUnit, status: 'Need Recheck', original: null, source: 'Unknown' }
   }
   if (typeof raw === 'number' && Number.isFinite(raw)) {
-    return { value: raw, unit: inputUnit, status: 'Measured', original: null, source: 'Internal Measurement' }
+    return { value: raw, unit: inputUnit, status: 'Pending Review', original: null, source: 'Internal Measurement' }
   }
   const s = cleanText(raw)
   if (!s) {
-    return { value: null, unit: inputUnit, status: 'Missing', original: null, source: 'Unknown' }
+    return { value: null, unit: inputUnit, status: 'Need Recheck', original: null, source: 'Unknown' }
   }
   const kgMatch = s.match(/([\d.]+)\s*kg/i)
   const gMatch = s.match(/([\d.]+)\s*g\b/i)
   if (/TBD|\?/i.test(s)) {
     if (kgMatch) {
-      return { value: Number(kgMatch[1]), unit: 'kg', status: 'Estimated', original: s, source: 'Estimated' }
+      return { value: Number(kgMatch[1]), unit: 'kg', status: 'Pending Review', original: s, source: 'Estimated' }
     }
     if (gMatch) {
-      return { value: Number(gMatch[1]), unit: 'g', status: 'Estimated', original: s, source: 'Estimated' }
+      return { value: Number(gMatch[1]), unit: 'g', status: 'Pending Review', original: s, source: 'Estimated' }
     }
-    return { value: null, unit: inputUnit, status: 'Missing', original: s, source: 'Unknown' }
+    return { value: null, unit: inputUnit, status: 'Need Recheck', original: s, source: 'Unknown' }
   }
   if (kgMatch) {
-    return { value: Number(kgMatch[1]), unit: 'kg', status: 'Measured', original: null, source: 'Internal Measurement' }
+    return { value: Number(kgMatch[1]), unit: 'kg', status: 'Pending Review', original: null, source: 'Internal Measurement' }
   }
   if (gMatch) {
-    return { value: Number(gMatch[1]), unit: 'g', status: 'Measured', original: null, source: 'Internal Measurement' }
+    return { value: Number(gMatch[1]), unit: 'g', status: 'Pending Review', original: null, source: 'Internal Measurement' }
   }
   const num = Number(s.replace(/,/g, ''))
   if (Number.isFinite(num)) {
-    return { value: num, unit: inputUnit, status: 'Measured', original: null, source: 'Internal Measurement' }
+    return { value: num, unit: inputUnit, status: 'Pending Review', original: null, source: 'Internal Measurement' }
   }
-  return { value: null, unit: inputUnit, status: 'Missing', original: s, source: 'Unknown' }
+  return { value: null, unit: inputUnit, status: 'Need Recheck', original: s, source: 'Unknown' }
 }
 
 function sheetToRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
@@ -119,6 +127,23 @@ function excelDate(value: unknown): string | null {
   return s
 }
 
+function resolveImportedStatus(
+  statusRaw: unknown,
+  sourceRaw: unknown,
+  fallbackStatus: RecordStatus,
+  fallbackSource: DataSource,
+): { status: RecordStatus; source: DataSource } {
+  const sourceHint = cleanText(sourceRaw) || fallbackSource
+  if (statusRaw == null || String(statusRaw).trim() === '') {
+    return { status: fallbackStatus, source: normalizeDataSource(sourceHint, fallbackSource) }
+  }
+  const migrated = migrateRecordStatus(statusRaw, sourceHint)
+  return {
+    status: migrated.status,
+    source: normalizeDataSource(migrated.source ?? sourceHint, fallbackSource),
+  }
+}
+
 function ensureProject(projects: Project[], code: string, stamp: string): Project {
   let project = projects.find((p) => p.code === code)
   if (!project) {
@@ -136,6 +161,22 @@ function ensureProject(projects: Project[], code: string, stamp: string): Projec
     projects.push(project)
   }
   return project
+}
+
+function pickExtendedFields(row: Record<string, unknown>) {
+  return {
+    buildPhase: cleanText(pick(row, ['Build / Phase', 'Build Phase', 'Phase', 'Build'])),
+    configuration: cleanText(
+      pick(row, ['Configuration / Included Items', 'Configuration', 'Included Items']),
+    ),
+    supplier: cleanText(pick(row, ['Supplier / Data Provider', 'Supplier', 'Data Provider'])),
+    reference: cleanText(
+      pick(row, ['Reference / Document Rev.', 'Reference', 'Document Rev.', 'Document Rev']),
+    ),
+    measuredBy: cleanText(pick(row, ['Measured By', 'MeasuredBy', 'Tester'])),
+    reviewedBy: cleanText(pick(row, ['Reviewed By', 'ReviewedBy', 'Reviewer'])),
+    reviewedDate: excelDate(pick(row, ['Reviewed Date', 'ReviewedDate'])),
+  }
 }
 
 export interface ImportResult {
@@ -167,6 +208,13 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
       const parsed = parseWeight(weight.raw, defaultUnit, weight.unit)
       if (parsed.original) warnings.push(`${description}: ${parsed.original}`)
       const note = cleanText(pick(row, ['Note', 'Notes']))
+      const extended = pickExtendedFields(row)
+      const resolved = resolveImportedStatus(
+        pick(row, ['Status']),
+        pick(row, ['Source', 'Data Source']),
+        parsed.status,
+        parsed.source,
+      )
       const record: WeightRecord = {
         id: uid('rec'),
         projectId: project.id,
@@ -180,9 +228,16 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
         weightValue: parsed.value,
         weightUnit: parsed.unit,
         weight_kg: toWeightKg(parsed.value, parsed.unit),
+        buildPhase: extended.buildPhase || project.phase || null,
+        configuration: extended.configuration,
+        supplier: extended.supplier,
+        reference: extended.reference,
+        measuredBy: extended.measuredBy,
         measuredDate: excelDate(pick(row, ['Measured Date', 'Date'])),
-        source: parsed.source,
-        status: parsed.status,
+        source: resolved.source,
+        status: resolved.status,
+        reviewedBy: extended.reviewedBy,
+        reviewedDate: extended.reviewedDate,
         note,
         originalWeightText: parsed.original,
         createdAt: stamp,
@@ -190,7 +245,10 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
       }
       records.push(record)
       added += 1
-      project.expectedItems[level] = Math.max(project.expectedItems[level], records.filter((r) => r.projectId === project.id && r.level === level).length)
+      project.expectedItems[level] = Math.max(
+        project.expectedItems[level],
+        records.filter((r) => r.projectId === project.id && r.level === level).length,
+      )
       project.updatedAt = stamp
     }
   }
@@ -210,6 +268,13 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
       touched.add(project.code)
       const weight = pickWeight(row)
       const parsed = parseWeight(weight.raw, defaultUnit, weight.unit)
+      const extended = pickExtendedFields(row)
+      const resolved = resolveImportedStatus(
+        pick(row, ['Status']),
+        pick(row, ['Source', 'Data Source']),
+        parsed.status,
+        parsed.source,
+      )
       const record: WeightRecord = {
         id: uid('rec'),
         projectId: project.id,
@@ -223,9 +288,16 @@ export function importWorkbook(buffer: ArrayBuffer, data: AppData): { data: AppD
         weightValue: parsed.value,
         weightUnit: parsed.unit,
         weight_kg: toWeightKg(parsed.value, parsed.unit),
+        buildPhase: extended.buildPhase || project.phase || null,
+        configuration: extended.configuration,
+        supplier: extended.supplier,
+        reference: extended.reference,
+        measuredBy: extended.measuredBy,
         measuredDate: excelDate(pick(row, ['Measured Date', 'Date'])),
-        source: (cleanText(pick(row, ['Source', 'Data Source'])) as DataSource) || parsed.source,
-        status: (cleanText(pick(row, ['Status'])) as RecordStatus) || parsed.status,
+        source: resolved.source,
+        status: resolved.status,
+        reviewedBy: extended.reviewedBy,
+        reviewedDate: extended.reviewedDate,
         note: cleanText(pick(row, ['Note', 'Notes'])),
         originalWeightText: parsed.original,
         createdAt: stamp,
@@ -260,7 +332,14 @@ export function exportWorkbook(data: AppData): ArrayBuffer {
         Manufacturer: r.manufacturer || '',
         'Part Category': r.category || '',
         'Weight (kg)': getWeightKg(r) ?? r.originalWeightText ?? '',
+        'Build / Phase': r.buildPhase || '',
+        'Configuration / Included Items': r.configuration || '',
+        'Supplier / Data Provider': r.supplier || '',
+        'Reference / Document Rev.': r.reference || '',
+        'Measured By': r.measuredBy || '',
         'Measured Date': r.measuredDate || '',
+        'Reviewed By': r.reviewedBy || '',
+        'Reviewed Date': r.reviewedDate || '',
         Project: r.projectCode,
         Note: r.note || '',
         Source: r.source,
@@ -276,6 +355,7 @@ export function exportCsv(data: AppData): string {
   const header = [
     'Level',
     'Project',
+    'Build / Phase',
     'Description',
     'Lenovo PN',
     'MSFT PN',
@@ -283,9 +363,15 @@ export function exportCsv(data: AppData): string {
     'Category',
     'Weight (kg)',
     'Unit',
+    'Configuration / Included Items',
+    'Supplier / Data Provider',
+    'Reference / Document Rev.',
+    'Measured By',
     'Measured Date',
     'Source',
     'Status',
+    'Reviewed By',
+    'Reviewed Date',
     'Note',
   ]
   const lines = [header.join(',')]
@@ -293,6 +379,7 @@ export function exportCsv(data: AppData): string {
     const cols = [
       r.level,
       r.projectCode,
+      r.buildPhase || '',
       r.description,
       r.lenovoPn || '',
       r.customerPn || '',
@@ -300,9 +387,15 @@ export function exportCsv(data: AppData): string {
       r.category || '',
       getWeightKg(r) ?? '',
       'kg',
+      r.configuration || '',
+      r.supplier || '',
+      r.reference || '',
+      r.measuredBy || '',
       r.measuredDate || '',
       r.source,
       r.status,
+      r.reviewedBy || '',
+      r.reviewedDate || '',
       r.note || '',
     ].map((v) => {
       const s = String(v)

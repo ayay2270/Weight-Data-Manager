@@ -1,8 +1,57 @@
-import type { AppData, ExpectedItems, Level, WeightRecord, WeightUnit } from '../data/types'
-import { COLLECTED_STATUSES, LEVELS } from '../data/types'
+import type {
+  AppData,
+  DataSource,
+  ExpectedItems,
+  Level,
+  RecordStatus,
+  WeightRecord,
+  WeightUnit,
+} from '../data/types'
+import { COLLECTED_STATUSES, DATA_SOURCES, LEVELS, RECORD_STATUSES } from '../data/types'
 
 export function nowIso(): string {
   return new Date().toISOString()
+}
+
+export function todayDate(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export function statusBadgeClass(status: string): string {
+  return status.replace(/\s+/g, '-')
+}
+
+const DATA_SOURCE_SET = new Set<string>(DATA_SOURCES)
+const RECORD_STATUS_SET = new Set<string>(RECORD_STATUSES)
+
+export function migrateRecordStatus(
+  status: unknown,
+  source?: unknown,
+): { status: RecordStatus; source?: DataSource } {
+  const raw = typeof status === 'string' ? status.trim() : ''
+  if (RECORD_STATUS_SET.has(raw)) {
+    return { status: raw as RecordStatus }
+  }
+  switch (raw) {
+    case 'Measured':
+      return { status: 'Pending Review' }
+    case 'Estimated': {
+      const src = typeof source === 'string' ? source.trim() : ''
+      if (!src || src === 'Unknown' || !DATA_SOURCE_SET.has(src)) {
+        return { status: 'Pending Review', source: 'Estimated' }
+      }
+      return { status: 'Pending Review' }
+    }
+    case 'Missing':
+      return { status: 'Need Recheck' }
+    default:
+      return { status: 'Draft' }
+  }
+}
+
+export function normalizeDataSource(source: unknown, fallback: DataSource = 'Unknown'): DataSource {
+  const raw = typeof source === 'string' ? source.trim() : ''
+  return DATA_SOURCE_SET.has(raw) ? (raw as DataSource) : fallback
 }
 
 export function uid(prefix: string): string {
@@ -39,11 +88,23 @@ export function normalizeWeightRecord<T extends Partial<WeightRecord>>(record: T
         : null
   const weight_kg = legacyWeight == null ? suppliedCanonical : toWeightKg(legacyWeight, weightUnit)
   const { weightKg: _legacyWeightKg, ...withoutLegacyWeightKg } = record
+  const migrated = migrateRecordStatus(record.status, record.source)
+  const source = normalizeDataSource(migrated.source ?? record.source)
   return {
     ...withoutLegacyWeightKg,
     weightValue: legacyWeight ?? weight_kg,
     weightUnit: legacyWeight == null ? 'kg' : weightUnit,
     weight_kg,
+    buildPhase: record.buildPhase ?? null,
+    configuration: record.configuration ?? null,
+    supplier: record.supplier ?? null,
+    reference: record.reference ?? null,
+    measuredBy: record.measuredBy ?? null,
+    measuredDate: record.measuredDate ?? null,
+    reviewedBy: record.reviewedBy ?? null,
+    reviewedDate: record.reviewedDate ?? null,
+    source,
+    status: migrated.status,
   } as T & WeightRecord
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
 import { DATA_SOURCES, LEVELS, RECORD_STATUSES } from '../data/types'
-import { nowIso, toWeightKg, uid } from '../utils/helpers'
+import { nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
 import { Modal } from './Modal'
 
 interface RecordFormModalProps {
@@ -16,6 +16,7 @@ interface RecordFormModalProps {
 
 const emptyForm = {
   projectId: '',
+  buildPhase: '',
   level: 'Part' as Level,
   description: '',
   lenovoPn: '',
@@ -24,9 +25,15 @@ const emptyForm = {
   category: '',
   weightValue: '',
   weightUnit: 'g' as WeightUnit,
-  measuredDate: '',
+  configuration: '',
   source: 'Internal Measurement' as DataSource,
+  supplier: '',
+  reference: '',
+  measuredBy: '',
+  measuredDate: '',
   status: 'Draft' as RecordStatus,
+  reviewedBy: '',
+  reviewedDate: '',
   note: '',
 }
 
@@ -47,6 +54,7 @@ export function RecordFormModal({
     if (initial) {
       setForm({
         projectId: initial.projectId,
+        buildPhase: initial.buildPhase || '',
         level: initial.level,
         description: initial.description,
         lenovoPn: initial.lenovoPn || '',
@@ -55,17 +63,25 @@ export function RecordFormModal({
         category: initial.category || '',
         weightValue: initial.weightValue != null ? String(initial.weightValue) : '',
         weightUnit: initial.weightUnit,
-        measuredDate: initial.measuredDate || '',
+        configuration: initial.configuration || '',
         source: initial.source,
+        supplier: initial.supplier || '',
+        reference: initial.reference || '',
+        measuredBy: initial.measuredBy || '',
+        measuredDate: initial.measuredDate || '',
         status: initial.status,
+        reviewedBy: initial.reviewedBy || '',
+        reviewedDate: initial.reviewedDate || '',
         note: initial.note || '',
       })
     } else {
       const projectId = defaultProjectId || projects[0]?.id || ''
+      const project = projects.find((p) => p.id === projectId)
       const level: Level = 'Part'
       setForm({
         ...emptyForm,
         projectId,
+        buildPhase: project?.phase || '',
         level,
         weightUnit: level === 'Part' ? 'g' : defaultUnit,
       })
@@ -75,6 +91,7 @@ export function RecordFormModal({
 
   const showPartFields = form.level === 'Part' || form.level === 'Node' || form.level === 'Rack'
   const showPackageHint = form.level === 'Package'
+  const showSupplierEmphasis = form.source === 'Supplier'
   const convertedKg = form.weightValue.trim() === '' ? null : toWeightKg(Number(form.weightValue), form.weightUnit)
 
   const activeProjects = useMemo(
@@ -85,13 +102,33 @@ export function RecordFormModal({
   if (!open) return null
 
   function setLevel(level: Level) {
+    setForm((prev) => ({
+      ...prev,
+      level,
+      category: level === 'Package' && !prev.category ? 'Packaging' : prev.category,
+    }))
+  }
+
+  function setProject(projectId: string) {
     setForm((prev) => {
+      const project = projects.find((p) => p.id === projectId)
+      // Only default Build / Phase from project when creating a new record.
+      if (initial) return { ...prev, projectId }
       return {
         ...prev,
-        level,
-        category: level === 'Package' && !prev.category ? 'Packaging' : prev.category,
+        projectId,
+        buildPhase: project?.phase || '',
       }
     })
+  }
+
+  function setStatus(status: RecordStatus) {
+    setForm((prev) => ({
+      ...prev,
+      status,
+      reviewedDate:
+        status === 'Verified' && !prev.reviewedDate.trim() ? todayDate() : prev.reviewedDate,
+    }))
   }
 
   function handleSave() {
@@ -104,17 +141,20 @@ export function RecordFormModal({
       setError('Description is required.')
       return
     }
-    const weightValue =
-      form.weightValue.trim() === '' ? null : Number(form.weightValue)
+    const weightValue = form.weightValue.trim() === '' ? null : Number(form.weightValue)
     if (form.weightValue.trim() !== '' && !Number.isFinite(weightValue)) {
       setError('Weight must be a valid number.')
       return
     }
     if (
-      (form.status === 'Measured' || form.status === 'Verified' || form.status === 'Estimated') &&
+      (form.status === 'Pending Review' || form.status === 'Verified') &&
       (weightValue == null || weightValue <= 0)
     ) {
-      setError('Measured / Verified / Estimated records need a weight greater than zero.')
+      setError('Pending Review / Verified records need a weight greater than zero.')
+      return
+    }
+    if (form.status === 'Verified' && !form.reviewedBy.trim()) {
+      setError('Reviewed By is required when Status is Verified.')
       return
     }
 
@@ -132,9 +172,16 @@ export function RecordFormModal({
       weightValue,
       weightUnit: form.weightUnit,
       weight_kg: toWeightKg(weightValue, form.weightUnit),
+      buildPhase: form.buildPhase.trim() || null,
+      configuration: form.configuration.trim() || null,
+      supplier: form.supplier.trim() || null,
+      reference: form.reference.trim() || null,
+      measuredBy: form.measuredBy.trim() || null,
       measuredDate: form.measuredDate || null,
       source: form.source,
       status: form.status,
+      reviewedBy: form.reviewedBy.trim() || null,
+      reviewedDate: form.reviewedDate || null,
       note: form.note.trim() || null,
       originalWeightText: initial?.originalWeightText || null,
       createdAt: initial?.createdAt || stamp,
@@ -162,10 +209,7 @@ export function RecordFormModal({
       <div className="form-grid">
         <label>
           Project
-          <select
-            value={form.projectId}
-            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-          >
+          <select value={form.projectId} onChange={(e) => setProject(e.target.value)}>
             <option value="">Select project…</option>
             {activeProjects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -173,6 +217,14 @@ export function RecordFormModal({
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          Build / Phase
+          <input
+            value={form.buildPhase}
+            onChange={(e) => setForm({ ...form, buildPhase: e.target.value })}
+            placeholder="e.g. DV, PVT"
+          />
         </label>
         <label>
           Level
@@ -184,8 +236,9 @@ export function RecordFormModal({
             ))}
           </select>
         </label>
+
         <label className="span-2">
-          Description
+          Part Description
           <input
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -197,7 +250,7 @@ export function RecordFormModal({
           <input value={form.lenovoPn} onChange={(e) => setForm({ ...form, lenovoPn: e.target.value })} />
         </label>
         <label>
-          Customer / MSFT PN
+          MSFT / Customer PN
           <input value={form.customerPn} onChange={(e) => setForm({ ...form, customerPn: e.target.value })} />
         </label>
         {showPartFields ? (
@@ -210,14 +263,14 @@ export function RecordFormModal({
               />
             </label>
             <label>
-              Category
+              Part Category
               <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             </label>
           </>
         ) : null}
         {showPackageHint ? (
           <label className="span-2">
-            Category
+            Part Category
             <input
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -225,6 +278,7 @@ export function RecordFormModal({
             />
           </label>
         ) : null}
+
         <label className="span-2">
           Weight
           <div className="weight-input">
@@ -248,14 +302,16 @@ export function RecordFormModal({
             Converted: {convertedKg != null && Number.isFinite(convertedKg) ? `${convertedKg.toFixed(3)} kg` : '—'}
           </small>
         </label>
-        <label>
-          Measured Date
+
+        <label className="span-2">
+          Configuration / Included Items
           <input
-            type="date"
-            value={form.measuredDate}
-            onChange={(e) => setForm({ ...form, measuredDate: e.target.value })}
+            value={form.configuration}
+            onChange={(e) => setForm({ ...form, configuration: e.target.value })}
+            placeholder="e.g. Full rack + pallet, Bare motherboard"
           />
         </label>
+
         <label>
           Source
           <select
@@ -269,12 +325,43 @@ export function RecordFormModal({
             ))}
           </select>
         </label>
+        <label className={showSupplierEmphasis ? undefined : 'soft-field'}>
+          Supplier / Data Provider
+          <input
+            value={form.supplier}
+            onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+            placeholder="e.g. Bromake, Guangda"
+          />
+        </label>
+        <label className={`span-2${showSupplierEmphasis ? '' : ' soft-field'}`}>
+          Reference / Document Rev.
+          <input
+            value={form.reference}
+            onChange={(e) => setForm({ ...form, reference: e.target.value })}
+            placeholder="e.g. PKG Weight List Rev.B"
+          />
+        </label>
+
+        <label>
+          Measured By
+          <input
+            value={form.measuredBy}
+            onChange={(e) => setForm({ ...form, measuredBy: e.target.value })}
+            placeholder="Tester name"
+          />
+        </label>
+        <label>
+          Measured Date
+          <input
+            type="date"
+            value={form.measuredDate}
+            onChange={(e) => setForm({ ...form, measuredDate: e.target.value })}
+          />
+        </label>
+
         <label>
           Status
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value as RecordStatus })}
-          >
+          <select value={form.status} onChange={(e) => setStatus(e.target.value as RecordStatus)}>
             {RECORD_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -282,6 +369,23 @@ export function RecordFormModal({
             ))}
           </select>
         </label>
+        <label>
+          Reviewed By
+          <input
+            value={form.reviewedBy}
+            onChange={(e) => setForm({ ...form, reviewedBy: e.target.value })}
+            placeholder="Engineer name"
+          />
+        </label>
+        <label>
+          Reviewed Date
+          <input
+            type="date"
+            value={form.reviewedDate}
+            onChange={(e) => setForm({ ...form, reviewedDate: e.target.value })}
+          />
+        </label>
+
         <label className="span-2">
           Note
           <textarea

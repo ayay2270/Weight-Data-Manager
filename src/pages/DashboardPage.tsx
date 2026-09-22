@@ -23,6 +23,7 @@ import {
   overallDataCompleteness,
   percentLabel,
   projectCompleteness,
+  statusBadgeClass,
 } from '../utils/helpers'
 
 export function DashboardPage() {
@@ -174,7 +175,7 @@ export function DashboardPage() {
                       </td>
                       <td>{formatWeightKg(r)}</td>
                       <td>
-                        <span className={`badge ${r.status}`}>{r.status}</span>
+                        <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
                       </td>
                     </tr>
                   ))}

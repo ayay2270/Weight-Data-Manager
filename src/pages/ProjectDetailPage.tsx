@@ -11,6 +11,7 @@ import {
   getWeightKg,
   percentLabel,
   projectCompleteness,
+  statusBadgeClass,
 } from '../utils/helpers'
 
 export function ProjectDetailPage() {
@@ -38,7 +39,7 @@ export function ProjectDetailPage() {
 
   const { collected, overall, byLevel } = projectCompleteness(project.expectedItems, projectRecords)
   const totals = countByLevel(projectRecords)
-  const missing = projectRecords.filter((r) => r.status === 'Missing' || r.weightValue == null)
+  const missing = projectRecords.filter((r) => r.status === 'Need Recheck' || r.weightValue == null)
   const latest = projectRecords.slice(0, 6)
   const totalKg = projectRecords.reduce((sum, r) => sum + (getWeightKg(r) || 0), 0)
 
@@ -142,7 +143,7 @@ export function ProjectDetailPage() {
                       <td className="description">{r.description}</td>
                       <td>{formatWeightKg(r)}</td>
                       <td>
-                        <span className={`badge ${r.status}`}>{r.status}</span>
+                        <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
                       </td>
                     </tr>
                   ))}
@@ -166,7 +167,7 @@ export function ProjectDetailPage() {
               {gaps.map((g) => (
                 <div className="missing-item" key={g}>
                   <span>{g}</span>
-                  <span className="badge Missing">Gap</span>
+                  <span className="badge Need-Recheck">Gap</span>
                 </div>
               ))}
               {missing.map((r) => (
@@ -174,7 +175,7 @@ export function ProjectDetailPage() {
                   <span>
                     <strong>{r.level}</strong> · {r.description}
                   </span>
-                  <span className={`badge ${r.status}`}>{r.status}</span>
+                  <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
                 </div>
               ))}
               {!gaps.length && !missing.length ? <div className="empty">No missing items for current targets.</div> : null}

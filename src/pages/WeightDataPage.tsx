@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Check, Copy, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { RecordFormModal } from '../components/RecordFormModal'
 import { useData } from '../hooks/useData'
-import type { Level, WeightRecord } from '../data/types'
-import { LEVELS } from '../data/types'
-import { formatDate, formatWeightKg } from '../utils/helpers'
+import type { Level, RecordStatus, WeightRecord } from '../data/types'
+import { LEVELS, RECORD_STATUSES } from '../data/types'
+import { formatWeightKg, statusBadgeClass, todayDate } from '../utils/helpers'
 
 type Tab = 'All' | Level
 
@@ -17,8 +17,21 @@ export function WeightDataPage() {
   const [query, setQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState(params.get('project') || '')
   const [statusFilter, setStatusFilter] = useState('')
+  const [sourceFilter, setSourceFilter] = useState('')
+  const [buildPhaseFilter, setBuildPhaseFilter] = useState('')
   const [editing, setEditing] = useState<WeightRecord | null>(null)
   const [showForm, setShowForm] = useState(false)
+
+  const buildPhaseOptions = useMemo(() => {
+    const values = new Set<string>()
+    for (const r of records) {
+      if (r.buildPhase) values.add(r.buildPhase)
+    }
+    for (const p of projects) {
+      if (p.phase) values.add(p.phase)
+    }
+    return [...values].sort()
+  }, [records, projects])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -26,14 +39,29 @@ export function WeightDataPage() {
       .filter((r) => (tab === 'All' ? true : r.level === tab))
       .filter((r) => (projectFilter ? r.projectCode === projectFilter : true))
       .filter((r) => (statusFilter ? r.status === statusFilter : true))
+      .filter((r) => (sourceFilter ? r.source === sourceFilter : true))
+      .filter((r) => (buildPhaseFilter ? (r.buildPhase || '') === buildPhaseFilter : true))
       .filter((r) => {
         if (!q) return true
-        return [r.description, r.lenovoPn, r.customerPn, r.manufacturer, r.category, r.projectCode]
+        return [
+          r.description,
+          r.lenovoPn,
+          r.customerPn,
+          r.manufacturer,
+          r.category,
+          r.projectCode,
+          r.buildPhase,
+          r.configuration,
+          r.supplier,
+          r.reference,
+          r.measuredBy,
+          r.reviewedBy,
+        ]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q))
       })
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  }, [records, tab, projectFilter, statusFilter, query])
+  }, [records, tab, projectFilter, statusFilter, sourceFilter, buildPhaseFilter, query])
 
   function openAdd() {
     setEditing(null)
@@ -43,6 +71,25 @@ export function WeightDataPage() {
   function openEdit(record: WeightRecord) {
     setEditing(record)
     setShowForm(true)
+  }
+
+  function applyReview(record: WeightRecord, status: RecordStatus) {
+    if (status === 'Verified') {
+      const reviewedBy = window.prompt('Reviewed By (required for Verified):', record.reviewedBy || '')
+      if (reviewedBy == null) return
+      if (!reviewedBy.trim()) {
+        window.alert('Reviewed By is required when Status is Verified.')
+        return
+      }
+      upsertRecord({
+        ...record,
+        status,
+        reviewedBy: reviewedBy.trim(),
+        reviewedDate: record.reviewedDate || todayDate(),
+      })
+      return
+    }
+    upsertRecord({ ...record, status })
   }
 
   return (
@@ -72,7 +119,7 @@ export function WeightDataPage() {
 
         <div className="filter-bar">
           <input
-            placeholder="Search description, PN, manufacturer…"
+            placeholder="Search description, PN, people, config, supplier…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -86,7 +133,29 @@ export function WeightDataPage() {
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>
-            {['Draft', 'Measured', 'Verified', 'Estimated', 'Missing'].map((s) => (
+            {RECORD_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+            <option value="">All sources</option>
+            {[
+              'Internal Measurement',
+              'Supplier',
+              'Specification',
+              'Estimated',
+              'Unknown',
+            ].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select value={buildPhaseFilter} onChange={(e) => setBuildPhaseFilter(e.target.value)}>
+            <option value="">All build / phase</option>
+            {buildPhaseOptions.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -100,38 +169,66 @@ export function WeightDataPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Project</th>
-                  <th>Level</th>
                   <th>Description</th>
-                  <th>Lenovo PN</th>
-                  <th>Category</th>
-                  <th>Weight (kg)</th>
-                  <th>Date</th>
+                  <th>Project</th>
+                  <th>Build / Phase</th>
+                  <th>Level</th>
+                  <th>Weight</th>
                   <th>Source</th>
+                  <th>Measured By</th>
                   <th>Status</th>
+                  <th>Reviewed By</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.projectCode}</td>
-                    <td>
-                      <span className="badge level">{r.level}</span>
-                    </td>
                     <td className="description" title={r.description}>
                       {r.description}
                     </td>
-                    <td>{r.lenovoPn || '—'}</td>
-                    <td>{r.category || '—'}</td>
-                    <td>{formatWeightKg(r)}</td>
-                    <td>{formatDate(r.measuredDate)}</td>
-                    <td>{r.source}</td>
+                    <td>{r.projectCode}</td>
+                    <td>{r.buildPhase || '—'}</td>
                     <td>
-                      <span className={`badge ${r.status}`}>{r.status}</span>
+                      <span className="badge level">{r.level}</span>
                     </td>
+                    <td>{formatWeightKg(r)}</td>
+                    <td>{r.source}</td>
+                    <td>{r.measuredBy || '—'}</td>
+                    <td>
+                      <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
+                    </td>
+                    <td>{r.reviewedBy || '—'}</td>
                     <td>
                       <div className="row-actions">
+                        {r.status === 'Pending Review' ? (
+                          <>
+                            <button
+                              type="button"
+                              className="button ghost"
+                              title="Verify"
+                              onClick={() => applyReview(r, 'Verified')}
+                            >
+                              <Check size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              className="button ghost"
+                              title="Need Recheck"
+                              onClick={() => applyReview(r, 'Need Recheck')}
+                            >
+                              <RotateCcw size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              className="button ghost"
+                              title="Reject"
+                              onClick={() => applyReview(r, 'Rejected')}
+                            >
+                              <X size={15} />
+                            </button>
+                          </>
+                        ) : null}
                         <button type="button" className="button ghost" title="Edit" onClick={() => openEdit(r)}>
                           <Pencil size={15} />
                         </button>

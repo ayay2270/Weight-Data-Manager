@@ -98,6 +98,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         id: uid('rec'),
         description: `${src.description} (copy)`,
         status: 'Draft',
+        reviewedBy: null,
+        reviewedDate: null,
         createdAt: stamp,
         updatedAt: stamp,
       }

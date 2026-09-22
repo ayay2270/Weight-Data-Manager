@@ -233,7 +233,7 @@ export function ProjectsPage() {
             </label>
           </div>
           <p className="muted" style={{ marginTop: 12 }}>
-            Completeness = Collected (Measured + Verified with weight) ÷ Expected. Expected values are stored per
+            Completeness = Collected (Pending Review + Verified with weight) ÷ Expected. Expected values are stored per
             project and are not hardcoded in dashboard components.
           </p>
         </Modal>

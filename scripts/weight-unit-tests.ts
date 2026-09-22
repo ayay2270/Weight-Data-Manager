@@ -23,9 +23,10 @@ assertEqual(formatWeightKg(normalizeWeightRecord({ weightValue: 22.1, weightUnit
 
 const legacy = normalizeAppData({
   ...base,
-  records: [{ id: 'legacy', projectId: 'p', projectCode: 'P', level: 'Part', description: 'Legacy', weightValue: 1180, weightUnit: 'g', source: 'Unknown', status: 'Measured', createdAt: '', updatedAt: '' }],
+  records: [{ id: 'legacy', projectId: 'p', projectCode: 'P', level: 'Part', description: 'Legacy', weightValue: 1180, weightUnit: 'g', source: 'Unknown', status: 'Measured' as never, createdAt: '', updatedAt: '' }],
 })
 assertEqual(legacy.records[0].weight_kg, 1.18, 'legacy weight/unit normalizes on read')
+assertEqual(legacy.records[0].status, 'Pending Review', 'legacy Measured migrates to Pending Review')
 assertEqual('weightKg' in legacy.records[0], false, 'legacy camelCase is not persisted after normalization')
 
 const edited = normalizeWeightRecord({ ...legacy.records[0], weightValue: 8.66, weightUnit: 'kg' })

@@ -7,7 +7,15 @@ export type DataSource =
   | 'Estimated'
   | 'Unknown'
 
-export type RecordStatus = 'Draft' | 'Measured' | 'Verified' | 'Estimated' | 'Missing'
+export type RecordStatus =
+  | 'Draft'
+  | 'Pending Review'
+  | 'Verified'
+  | 'Rejected'
+  | 'Need Recheck'
+
+/** Legacy statuses that may still exist in LocalStorage / imports. */
+export type LegacyRecordStatus = 'Measured' | 'Estimated' | 'Missing'
 
 export type ProjectStatus = 'Active' | 'Archived'
 
@@ -48,9 +56,18 @@ export interface WeightRecord {
   weight_kg?: number | null
   /** Legacy camelCase field accepted when reading older browser data. */
   weightKg?: number | null
+  /** Record-level build / phase (historical; not permanently bound to project phase). */
+  buildPhase?: string | null
+  /** What is included in the weighed configuration. */
+  configuration?: string | null
+  supplier?: string | null
+  reference?: string | null
+  measuredBy?: string | null
   measuredDate?: string | null
   source: DataSource
   status: RecordStatus
+  reviewedBy?: string | null
+  reviewedDate?: string | null
   note?: string | null
   originalWeightText?: string | null
   createdAt: string
@@ -82,10 +99,11 @@ export const DATA_SOURCES: DataSource[] = [
 
 export const RECORD_STATUSES: RecordStatus[] = [
   'Draft',
-  'Measured',
+  'Pending Review',
   'Verified',
-  'Estimated',
-  'Missing',
+  'Rejected',
+  'Need Recheck',
 ]
 
-export const COLLECTED_STATUSES: RecordStatus[] = ['Measured', 'Verified']
+/** Records counted toward collection completeness (have usable measured data). */
+export const COLLECTED_STATUSES: RecordStatus[] = ['Pending Review', 'Verified']

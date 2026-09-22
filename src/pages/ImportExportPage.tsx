@@ -77,8 +77,7 @@ export function ImportExportPage() {
             </div>
             <div className="stack">
               <p className="muted">
-                Supported: Weight Measurement Record X01 workbook, multi-sheet Excel exports, and flat CSV with a
-                Level column. Weights with TBD text become Estimated or Missing.
+                Existing X01 Excel and CSV files are normalized automatically during import.
               </p>
               <input
                 ref={fileRef}

@@ -419,21 +419,25 @@ tr.clickable:hover {
   font-weight: 600;
 }
 
-.badge.Measured,
 .badge.Verified {
   background: var(--green-bg);
   color: var(--green);
 }
 
-.badge.Estimated,
+.badge.Pending-Review,
 .badge.Draft {
   background: var(--amber-bg);
   color: var(--amber);
 }
 
-.badge.Missing {
+.badge.Rejected,
+.badge.Need-Recheck {
   background: var(--red-bg);
   color: var(--red);
+}
+
+.soft-field {
+  opacity: 0.72;
 }
 
 .badge.level {

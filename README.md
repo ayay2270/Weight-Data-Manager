@@ -86,10 +86,12 @@ npx --yes gh-pages -d dist -b gh-pages
 ## Data notes
 
 - Record tables display canonical kilograms to three decimal places; the original numeric input and unit remain available when editing.
-- Completeness = records with status Measured or Verified (and a weight) ÷ project `expectedItems`
+- Completeness = records with status Pending Review or Verified (and a weight) ÷ project `expectedItems`
 - Expected counts are editable per project in the Projects UI — not hardcoded in dashboard widgets
 - Source values: Internal Measurement, Supplier, Specification, Estimated, Unknown
-- Status values: Draft, Measured, Verified, Estimated, Missing
+- Status values: Draft, Pending Review, Verified, Rejected, Need Recheck
+- Record fields also include Build / Phase, Configuration, Measured By, Reviewed By / Date, Supplier, Reference
+- Older LocalStorage statuses (Measured / Estimated / Missing) are migrated on read
 - UI language: Traditional Chinese / English only (no Simplified Chinese chrome or README)
 
 ## License / scope

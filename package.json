@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:weights": "tsx scripts/weight-unit-tests.ts"
+    "test:weights": "tsx scripts/weight-unit-tests.ts",
+    "test:workflow": "tsx scripts/workflow-tests.ts",
+    "test": "npm run test:weights && npm run test:workflow"
   },
   "dependencies": {
     "lucide-react": "^1.47.0",
