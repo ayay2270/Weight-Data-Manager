@@ -87,15 +87,30 @@ If `weight_manager.db-wal` or `weight_manager.db-shm` remains after shutdown, as
 - Details and log path: click **Show Details**.
 - Port 8000 must be free.
 
-## Development and rebuild (maintainers)
+## Development and rebuild (maintainers only)
+
+Department Host PC users never use these steps. They only run `Weight Data Manager.exe`.
+
+**Sole Windows build entry:** on a build machine with Python 3.11+ on PATH, run:
 
 ```text
-setup_server.bat      create .venv and install requirements
-run_tests.bat         pytest
-build_release.bat     rebuild Weight Data Manager.exe via the .spec into dist\Weight Data Manager
-start_server.bat      developer server without the Tk launcher
+build_release.bat
 ```
 
-Windows is required to produce the release EXE. On Linux CI or Cloud Agent hosts, run tests and keep scripts current; document that EXE rebuild needs a Windows maintainer machine.
+That script checks for Python, creates `.venv`, installs requirements + PyInstaller, and builds `dist\Weight Data Manager\`. If Python is missing it prints **BUILD FAILED**, exits with a non-zero code, and does not claim success.
+
+Optional maintainer checks after a successful build (requires the `.venv` from `build_release.bat`):
+
+```text
+run_tests.bat
+```
+
+Developer server without the Tk launcher (maintainer Python checkout only):
+
+```text
+.venv\Scripts\python.exe start_server.py
+```
+
+Windows is required to produce the release EXE. On Linux CI or Cloud Agent hosts, run `pytest` in a venv and rebuild the EXE later on a Windows build machine.
 
 Version 1 intentionally does not include login, SSO, roles, Docker, cloud deployment, Teams/email notification, PLM/BOM integration, or CAE calculations.
