@@ -1,1 +1,13 @@
-uploads/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+server.log
+logs/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+backups/*.db
+build/
+dist/
+*.spec.bak

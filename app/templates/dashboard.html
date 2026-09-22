@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block heading %}Dashboard{% endblock %}{% block subheading %}Live department measurement overview{% endblock %}
+{% block content %}
+<form class="filter-bar" method="get"><select name="project"><option value="">All projects</option>{% for p in projects %}<option {% if filters.project==p.code %}selected{% endif %}>{{p.code}}</option>{% endfor %}</select><select name="level"><option value="">All levels</option>{% for x in ['Part','Node','Rack','Package'] %}<option {% if filters.level==x %}selected{% endif %}>{{x}}</option>{% endfor %}</select><select name="status"><option value="">All statuses</option>{% for x in ['Draft','Pending Review','Approved','Returned'] %}<option {% if filters.status==x %}selected{% endif %}>{{x}}</option>{% endfor %}</select><input name="search" value="{{filters.search}}" placeholder="Description or PN"><button class="button">Apply</button><a class="button secondary" href="/">Reset</a></form>
+<div class="cards"><div class="card"><span>Total Records</span><strong>{{stats.total}}</strong></div><div class="card pending"><span>Pending Review</span><strong>{{stats.pending}}</strong></div><div class="card approved"><span>Approved</span><strong>{{stats.approved}}</strong></div><div class="card warning"><span>Missing / TBD</span><strong>{{stats.missing}}</strong></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Recent records</h2><p>Updates from the shared central database</p></div><a href="/records/new" class="button">Add record</a></div>
+{% include "record_table.html" %}</div>
+{% endblock %}
+
