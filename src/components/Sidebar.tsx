@@ -21,7 +21,7 @@ export function Sidebar() {
       <div className="brand">
         <img
           className="brand-logo"
-          src={`${import.meta.env.BASE_URL}lenovo-logo.svg`}
+          src={`${import.meta.env.BASE_URL}lenovo-logo.png`}
           alt="Lenovo"
           width={58}
           height={16}
