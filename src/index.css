@@ -592,6 +592,11 @@ tr.clickable:hover {
   color: var(--green);
 }
 
+.badge.Active {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
 .badge.Pending-Review,
 .badge.Draft {
   background: var(--amber-bg);
@@ -1007,6 +1012,104 @@ tr.clickable:hover {
   margin: 0;
 }
 
+.status-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.status-overview-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 28px;
+  gap: 10px;
+  align-items: center;
+}
+
+.status-overview-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status-overview-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #eef2f6;
+  overflow: hidden;
+}
+
+.status-overview-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #94a3b8;
+  min-width: 0;
+}
+
+.status-overview-fill.draft {
+  background: #94a3b8;
+}
+
+.status-overview-fill.pending {
+  background: #d29a35;
+}
+
+.status-overview-fill.verified {
+  background: #3b966b;
+}
+
+.status-overview-fill.rejected,
+.status-overview-fill.recheck {
+  background: #c45b5b;
+}
+
+.status-overview-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.level-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.level-summary-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fcfdfe;
+  padding: 14px 16px;
+  border-left: 4px solid #8090a5;
+}
+
+.level-summary-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.level-summary-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+.level-summary-card.tone-0 {
+  border-left-color: var(--blue);
+}
+
+.level-summary-card.tone-1 {
+  border-left-color: #3b966b;
+}
+
+.level-summary-card.tone-2 {
+  border-left-color: #d29a35;
+}
+
+.level-summary-card.tone-3 {
+  border-left-color: var(--navy);
+}
+
 .row-actions {
   display: flex;
   gap: 4px;
@@ -1040,7 +1143,7 @@ tr.clickable:hover {
 }
 
 .dashboard-summary-cards {
-  margin-bottom: 8px;
+  margin-bottom: 18px;
 }
 
 .dashboard-summary-card {
@@ -1078,7 +1181,7 @@ tr.clickable:hover {
 
 .dashboard-last-updated {
   text-align: right;
-  margin: 0 2px 16px;
+  margin: -10px 2px 16px;
   font-size: 12px;
 }
 
@@ -1219,8 +1322,12 @@ tr.clickable:hover {
   .grid-3,
   .detail-grid,
   .export-layout,
-  .dashboard-project-grid {
+  .dashboard-project-grid,
+  .level-summary-grid {
     grid-template-columns: 1fr;
+  }
+  .status-overview-row {
+    grid-template-columns: 110px minmax(0, 1fr) 28px;
   }
   .advanced-panel {
     position: static;

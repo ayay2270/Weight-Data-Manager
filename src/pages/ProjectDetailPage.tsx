@@ -1,28 +1,94 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { LevelProgress } from '../components/LevelProgress'
+import { CalendarDays, CheckCircle2, Clock3, Database, Pencil } from 'lucide-react'
+import { Modal } from '../components/Modal'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
-import { LEVELS } from '../data/types'
+import type { Project, RecordStatus } from '../data/types'
+import { LEVELS, RECORD_STATUSES } from '../data/types'
 import {
   countByLevel,
+  emptyExpected,
   formatDate,
   formatWeightKg,
-  getWeightKg,
-  percentLabel,
-  projectCompleteness,
+  nowIso,
   statusBadgeClass,
 } from '../utils/helpers'
 
+const STATUS_BAR_CLASS: Record<RecordStatus, string> = {
+  Draft: 'draft',
+  'Pending Review': 'pending',
+  Verified: 'verified',
+  Rejected: 'rejected',
+  'Need Recheck': 'recheck',
+}
+
 export function ProjectDetailPage() {
   const { projectId } = useParams()
-  const { projects, records } = useData()
+  const { projects, records, upsertProject } = useData()
   const project = projects.find((p) => p.id === projectId)
+  const [showEdit, setShowEdit] = useState(false)
+  const [form, setForm] = useState({
+    code: '',
+    name: '',
+    phase: '',
+    status: 'Active' as Project['status'],
+    notes: '',
+  })
 
   const projectRecords = useMemo(
     () => records.filter((r) => r.projectId === projectId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [records, projectId],
   )
+
+  const statusCounts = useMemo(() => {
+    const counts = Object.fromEntries(RECORD_STATUSES.map((s) => [s, 0])) as Record<RecordStatus, number>
+    for (const record of projectRecords) {
+      counts[record.status] = (counts[record.status] || 0) + 1
+    }
+    return counts
+  }, [projectRecords])
+
+  const pendingCount = statusCounts['Pending Review'] || 0
+  const verifiedCount = statusCounts.Verified || 0
+  const totals = countByLevel(projectRecords)
+  const latest = projectRecords.slice(0, 6)
+  const reviewQueue = projectRecords
+    .filter((r) => r.status === 'Pending Review' || r.status === 'Need Recheck')
+    .slice(0, 8)
+  const updatedAt = useMemo(() => {
+    if (!project) return null
+    const times = [project.updatedAt, ...projectRecords.map((r) => r.updatedAt)].filter(Boolean)
+    return times.sort().at(-1) || project.updatedAt
+  }, [project, projectRecords])
+  const maxStatus = Math.max(1, ...RECORD_STATUSES.map((s) => statusCounts[s] || 0))
+
+  function openEdit() {
+    if (!project) return
+    setForm({
+      code: project.code,
+      name: project.name,
+      phase: project.phase || '',
+      status: project.status,
+      notes: project.notes || '',
+    })
+    setShowEdit(true)
+  }
+
+  function saveProject() {
+    if (!project || !form.code.trim() || !form.name.trim()) return
+    upsertProject({
+      ...project,
+      code: form.code.trim(),
+      name: form.name.trim(),
+      phase: form.phase.trim() || null,
+      status: form.status,
+      expectedItems: project.expectedItems ? { ...project.expectedItems } : emptyExpected(),
+      notes: form.notes.trim() || null,
+      updatedAt: nowIso(),
+    })
+    setShowEdit(false)
+  }
 
   if (!project) {
     return (
@@ -37,46 +103,59 @@ export function ProjectDetailPage() {
     )
   }
 
-  const { collected, overall, byLevel } = projectCompleteness(project.expectedItems, projectRecords)
-  const totals = countByLevel(projectRecords)
-  const missing = projectRecords.filter((r) => r.status === 'Need Recheck' || r.weightValue == null)
-  const latest = projectRecords.slice(0, 6)
-  const totalKg = projectRecords.reduce((sum, r) => sum + (getWeightKg(r) || 0), 0)
-
-  const gaps = LEVELS.flatMap((level) => {
-    const shortfall = Math.max(0, project.expectedItems[level] - collected[level])
-    if (shortfall <= 0) return []
-    return [`${level}: need ${shortfall} more collected item(s)`]
-  })
-
   return (
     <>
       <PageHeader
         title={`${project.code} · ${project.name}`}
         subtitle={`${project.phase || 'No phase'} · ${project.status}`}
         actions={
-          <Link className="button secondary" to="/projects">
-            All Projects
-          </Link>
+          <>
+            <button type="button" className="button" onClick={openEdit}>
+              <Pencil size={16} /> Edit Project
+            </button>
+            <Link className="button secondary" to={`/weight-data?project=${encodeURIComponent(project.code)}`}>
+              Open Weight Data
+            </Link>
+          </>
         }
       />
       <div className="content">
-        <div className="cards">
-          <div className="card blue">
-            <span>Completeness</span>
-            <strong>{percentLabel(overall)}</strong>
+        <div className="cards dashboard-summary-cards">
+          <div className="card slate dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <Database size={18} />
+            </div>
+            <div>
+              <span>Total Records</span>
+              <strong>{projectRecords.length}</strong>
+            </div>
           </div>
-          <div className="card green">
-            <span>Records</span>
-            <strong>{projectRecords.length}</strong>
+          <div className="card amber dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <Clock3 size={18} />
+            </div>
+            <div>
+              <span>Pending Review</span>
+              <strong>{pendingCount}</strong>
+            </div>
           </div>
-          <div className="card amber">
-            <span>Total Mass</span>
-            <strong style={{ fontSize: 22 }}>{totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</strong>
+          <div className="card green dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <CheckCircle2 size={18} />
+            </div>
+            <div>
+              <span>Verified</span>
+              <strong>{verifiedCount}</strong>
+            </div>
           </div>
-          <div className="card slate">
-            <span>Updated</span>
-            <strong style={{ fontSize: 20 }}>{formatDate(project.updatedAt)}</strong>
+          <div className="card blue dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <CalendarDays size={18} />
+            </div>
+            <div>
+              <span>Updated</span>
+              <strong style={{ fontSize: 22 }}>{formatDate(updatedAt)}</strong>
+            </div>
           </div>
         </div>
 
@@ -86,32 +165,42 @@ export function ProjectDetailPage() {
               <h2>Project Info</h2>
             </div>
             <dl className="details">
-              <dt>Code</dt>
+              <dt>Project</dt>
               <dd>{project.code}</dd>
-              <dt>Name</dt>
-              <dd>{project.name}</dd>
+              <dt>Description</dt>
+              <dd>{project.name || '—'}</dd>
               <dt>Phase</dt>
               <dd>{project.phase || '—'}</dd>
               <dt>Status</dt>
-              <dd>{project.status}</dd>
+              <dd>
+                <span className={`badge ${project.status}`}>{project.status}</span>
+              </dd>
               <dt>Notes</dt>
               <dd>{project.notes || '—'}</dd>
-              <dt>Expected items</dt>
-              <dd>
-                Part {project.expectedItems.Part} · Node {project.expectedItems.Node} · Rack{' '}
-                {project.expectedItems.Rack} · Package {project.expectedItems.Package}
-              </dd>
             </dl>
           </div>
 
           <div className="panel">
             <div className="panel-head">
-              <h2>Completeness Breakdown</h2>
+              <h2>Record Status Overview</h2>
             </div>
-            <LevelProgress expected={project.expectedItems} collected={collected} />
-            <div style={{ marginTop: 16 }} className="muted">
-              Part {percentLabel(byLevel.Part)} · Node {percentLabel(byLevel.Node)} · Rack{' '}
-              {percentLabel(byLevel.Rack)} · Package {percentLabel(byLevel.Package)}
+            <div className="status-overview">
+              {RECORD_STATUSES.map((status) => {
+                const count = statusCounts[status] || 0
+                const width = `${Math.round((count / maxStatus) * 100)}%`
+                return (
+                  <div key={status} className="status-overview-row">
+                    <div className="status-overview-label">{status}</div>
+                    <div className="status-overview-track">
+                      <div
+                        className={`status-overview-fill ${STATUS_BAR_CLASS[status]}`}
+                        style={{ width: count ? width : '0%' }}
+                      />
+                    </div>
+                    <div className="status-overview-count">{count}</div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -120,8 +209,8 @@ export function ProjectDetailPage() {
           <div className="panel">
             <div className="panel-head">
               <h2>Latest Records</h2>
-              <Link className="button ghost" to={`/weight-data?project=${project.code}`}>
-                Open table
+              <Link className="button ghost" to={`/weight-data?project=${encodeURIComponent(project.code)}`}>
+                Open weight data →
               </Link>
             </div>
             <div className="table-wrap">
@@ -140,7 +229,9 @@ export function ProjectDetailPage() {
                       <td>
                         <span className="badge level">{r.level}</span>
                       </td>
-                      <td className="description">{r.description}</td>
+                      <td className="description" title={r.description}>
+                        {r.description || '—'}
+                      </td>
                       <td>{formatWeightKg(r)}</td>
                       <td>
                         <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
@@ -161,24 +252,45 @@ export function ProjectDetailPage() {
 
           <div className="panel">
             <div className="panel-head">
-              <h2>Missing / Incomplete Items</h2>
+              <h2>Review Queue</h2>
+              <Link className="button ghost" to={`/weight-data?project=${encodeURIComponent(project.code)}`}>
+                Open weight data →
+              </Link>
             </div>
-            <div className="missing-list">
-              {gaps.map((g) => (
-                <div className="missing-item" key={g}>
-                  <span>{g}</span>
-                  <span className="badge Need-Recheck">Gap</span>
-                </div>
-              ))}
-              {missing.map((r) => (
-                <div className="missing-item" key={r.id}>
-                  <span>
-                    <strong>{r.level}</strong> · {r.description}
-                  </span>
-                  <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
-                </div>
-              ))}
-              {!gaps.length && !missing.length ? <div className="empty">No missing items for current targets.</div> : null}
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Level</th>
+                    <th>Weight (kg)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviewQueue.map((r) => (
+                    <tr key={r.id}>
+                      <td className="description" title={r.description}>
+                        {r.description || '—'}
+                      </td>
+                      <td>
+                        <span className="badge level">{r.level}</span>
+                      </td>
+                      <td>{formatWeightKg(r)}</td>
+                      <td>
+                        <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {!reviewQueue.length ? (
+                    <tr>
+                      <td colSpan={4} className="empty">
+                        No records waiting for review.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -186,20 +298,66 @@ export function ProjectDetailPage() {
         <div className="panel">
           <div className="panel-head">
             <h2>Summary by Level</h2>
+            <p>Actual record counts for this project.</p>
           </div>
-          <div className="cards" style={{ marginBottom: 0 }}>
-            {LEVELS.map((level) => (
-              <div className="card" key={level}>
+          <div className="level-summary-grid">
+            {LEVELS.map((level, index) => (
+              <div className={`level-summary-card tone-${index}`} key={level}>
                 <span>{level}</span>
-                <strong>{totals[level]}</strong>
-                <em>
-                  Collected {collected[level]} / Expected {project.expectedItems[level]}
-                </em>
+                <strong>
+                  {totals[level]} {totals[level] === 1 ? 'record' : 'records'}
+                </strong>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      {showEdit ? (
+        <Modal
+          title="Edit Project"
+          onClose={() => setShowEdit(false)}
+          footer={
+            <>
+              <button type="button" className="button secondary" onClick={() => setShowEdit(false)}>
+                Cancel
+              </button>
+              <button type="button" className="button" onClick={saveProject}>
+                Save Project
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <label>
+              Project
+              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            </label>
+            <label>
+              Status
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value as Project['status'] })}
+              >
+                <option value="Active">Active</option>
+                <option value="Archived">Archived</option>
+              </select>
+            </label>
+            <label className="span-2">
+              Description
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </label>
+            <label>
+              Phase
+              <input value={form.phase} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
+            </label>
+            <label>
+              Notes
+              <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </label>
+          </div>
+        </Modal>
+      ) : null}
     </>
   )
 }

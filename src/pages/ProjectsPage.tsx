@@ -1,15 +1,29 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import {
+  CheckCircle2,
+  Clock3,
+  Database,
+  FolderKanban,
+  Plus,
+} from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
-import type { ExpectedItems, Project } from '../data/types'
-import { emptyExpected, nowIso, percentLabel, projectCompleteness, uid } from '../utils/helpers'
+import type { Project } from '../data/types'
+import { emptyExpected, formatDate, nowIso, uid } from '../utils/helpers'
+
+function projectUpdatedAt(project: Project, recordDates: string[]): string {
+  const times = [project.updatedAt, ...recordDates].filter(Boolean)
+  if (!times.length) return project.updatedAt
+  return times.sort().at(-1) || project.updatedAt
+}
 
 export function ProjectsPage() {
   const { projects, records, upsertProject } = useData()
   const [query, setQuery] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
   const [form, setForm] = useState({
@@ -17,16 +31,32 @@ export function ProjectsPage() {
     name: '',
     phase: '',
     status: 'Active' as Project['status'],
-    expectedItems: emptyExpected(),
     notes: '',
   })
+
+  const activeProjects = useMemo(() => projects.filter((p) => p.status === 'Active'), [projects])
+  const pendingReviewCount = records.filter((r) => r.status === 'Pending Review').length
+  const verifiedCount = records.filter((r) => r.status === 'Verified').length
+
+  const phaseOptions = useMemo(() => {
+    return [...new Set(projects.map((p) => p.phase).filter(Boolean) as string[])].sort()
+  }, [projects])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return projects
-      .filter((p) => !q || p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
+      .filter((p) => {
+        if (phaseFilter && (p.phase || '') !== phaseFilter) return false
+        if (statusFilter && p.status !== statusFilter) return false
+        if (!q) return true
+        return (
+          p.code.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          (p.notes || '').toLowerCase().includes(q)
+        )
+      })
       .sort((a, b) => a.code.localeCompare(b.code))
-  }, [projects, query])
+  }, [projects, query, phaseFilter, statusFilter])
 
   function openCreate() {
     setEditing(null)
@@ -35,7 +65,6 @@ export function ProjectsPage() {
       name: '',
       phase: '',
       status: 'Active',
-      expectedItems: { Part: 10, Node: 4, Rack: 1, Package: 0 },
       notes: '',
     })
     setShowForm(true)
@@ -48,7 +77,6 @@ export function ProjectsPage() {
       name: project.name,
       phase: project.phase || '',
       status: project.status,
-      expectedItems: { ...project.expectedItems },
       notes: project.notes || '',
     })
     setShowForm(true)
@@ -63,7 +91,7 @@ export function ProjectsPage() {
       name: form.name.trim(),
       phase: form.phase.trim() || null,
       status: form.status,
-      expectedItems: form.expectedItems,
+      expectedItems: editing?.expectedItems ? { ...editing.expectedItems } : emptyExpected(),
       notes: form.notes.trim() || null,
       createdAt: editing?.createdAt || stamp,
       updatedAt: stamp,
@@ -71,16 +99,11 @@ export function ProjectsPage() {
     setShowForm(false)
   }
 
-  function setExpected(key: keyof ExpectedItems, value: string) {
-    const n = Math.max(0, Number(value) || 0)
-    setForm((prev) => ({ ...prev, expectedItems: { ...prev.expectedItems, [key]: n } }))
-  }
-
   return (
     <>
       <PageHeader
         title="Projects"
-        subtitle="Manage project codes and configurable expected item counts for completeness."
+        subtitle="Manage projects and review weight data collection status."
         actions={
           <button type="button" className="button" onClick={openCreate}>
             <Plus size={16} /> Add Project
@@ -88,33 +111,91 @@ export function ProjectsPage() {
         }
       />
       <div className="content">
+        <div className="cards dashboard-summary-cards">
+          <div className="card blue dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <FolderKanban size={18} />
+            </div>
+            <div>
+              <span>Active Projects</span>
+              <strong>{activeProjects.length}</strong>
+            </div>
+          </div>
+          <div className="card slate dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <Database size={18} />
+            </div>
+            <div>
+              <span>Total Records</span>
+              <strong>{records.length}</strong>
+            </div>
+          </div>
+          <div className="card amber dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <Clock3 size={18} />
+            </div>
+            <div>
+              <span>Pending Review</span>
+              <strong>{pendingReviewCount}</strong>
+            </div>
+          </div>
+          <div className="card green dashboard-summary-card">
+            <div className="dashboard-summary-icon">
+              <CheckCircle2 size={18} />
+            </div>
+            <div>
+              <span>Verified</span>
+              <strong>{verifiedCount}</strong>
+            </div>
+          </div>
+        </div>
+
         <div className="filter-bar">
           <input
-            placeholder="Search project code or name…"
+            placeholder="Search project code or description..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)}>
+            <option value="">All phases</option>
+            {phaseOptions.map((phase) => (
+              <option key={phase} value={phase}>
+                {phase}
+              </option>
+            ))}
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="Active">Active</option>
+            <option value="Archived">Archived</option>
+          </select>
         </div>
+
         <div className="panel">
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Name</th>
+                  <th>Project</th>
+                  <th>Description</th>
                   <th>Phase</th>
                   <th>Status</th>
                   <th>Records</th>
-                  <th>Completeness</th>
-                  <th>Expected (P/N/R/Pkg)</th>
-                  <th></th>
+                  <th>Pending Review</th>
+                  <th>Verified</th>
+                  <th>Updated</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((project) => {
                   const projectRecords = records.filter((r) => r.projectId === project.id)
-                  const { overall } = projectCompleteness(project.expectedItems, projectRecords)
-                  const e = project.expectedItems
+                  const pending = projectRecords.filter((r) => r.status === 'Pending Review').length
+                  const verified = projectRecords.filter((r) => r.status === 'Verified').length
+                  const updated = projectUpdatedAt(
+                    project,
+                    projectRecords.map((r) => r.updatedAt),
+                  )
                   return (
                     <tr key={project.id}>
                       <td>
@@ -122,16 +203,15 @@ export function ProjectsPage() {
                           {project.code}
                         </Link>
                       </td>
-                      <td>{project.name}</td>
+                      <td>{project.name || '—'}</td>
                       <td>{project.phase || '—'}</td>
                       <td>
-                        <span className="badge">{project.status}</span>
+                        <span className={`badge ${project.status}`}>{project.status}</span>
                       </td>
                       <td>{projectRecords.length}</td>
-                      <td>{percentLabel(overall)}</td>
-                      <td>
-                        {e.Part}/{e.Node}/{e.Rack}/{e.Package}
-                      </td>
+                      <td>{pending}</td>
+                      <td>{verified}</td>
+                      <td>{formatDate(updated)}</td>
                       <td>
                         <button type="button" className="button ghost" onClick={() => openEdit(project)}>
                           Edit
@@ -142,13 +222,16 @@ export function ProjectsPage() {
                 })}
                 {!filtered.length ? (
                   <tr>
-                    <td colSpan={8} className="empty">
+                    <td colSpan={9} className="empty">
                       No projects found.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
+          </div>
+          <div className="muted" style={{ marginTop: 12, textAlign: 'right' }}>
+            Showing {filtered.length} of {projects.length} projects
           </div>
         </div>
       </div>
@@ -170,7 +253,7 @@ export function ProjectsPage() {
         >
           <div className="form-grid">
             <label>
-              Project Code
+              Project
               <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             </label>
             <label>
@@ -184,7 +267,7 @@ export function ProjectsPage() {
               </select>
             </label>
             <label className="span-2">
-              Name
+              Description
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label>
@@ -195,47 +278,7 @@ export function ProjectsPage() {
               Notes
               <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </label>
-            <label>
-              Expected Part
-              <input
-                type="number"
-                min={0}
-                value={form.expectedItems.Part}
-                onChange={(e) => setExpected('Part', e.target.value)}
-              />
-            </label>
-            <label>
-              Expected Node
-              <input
-                type="number"
-                min={0}
-                value={form.expectedItems.Node}
-                onChange={(e) => setExpected('Node', e.target.value)}
-              />
-            </label>
-            <label>
-              Expected Rack
-              <input
-                type="number"
-                min={0}
-                value={form.expectedItems.Rack}
-                onChange={(e) => setExpected('Rack', e.target.value)}
-              />
-            </label>
-            <label>
-              Expected Package
-              <input
-                type="number"
-                min={0}
-                value={form.expectedItems.Package}
-                onChange={(e) => setExpected('Package', e.target.value)}
-              />
-            </label>
           </div>
-          <p className="muted" style={{ marginTop: 12 }}>
-            Completeness = Collected (Pending Review + Verified with weight) ÷ Expected. Expected values are stored per
-            project and are not hardcoded in dashboard components.
-          </p>
         </Modal>
       ) : null}
     </>
