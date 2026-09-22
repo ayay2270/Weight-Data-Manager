@@ -329,7 +329,11 @@ export function WeightDataPage() {
                 {pageRecords.map((r) => (
                   <tr key={r.id}>
                     {isVisible('project') ? <td className="weight-table-project">{r.projectCode || '—'}</td> : null}
-                    {isVisible('description') ? <td className="weight-table-description" title={r.description}>{r.description || '—'}</td> : null}
+                    {isVisible('description') ? (
+                      <td className="weight-table-description" title={r.description}>
+                        <span className="description-text">{r.description || '—'}</span>
+                      </td>
+                    ) : null}
                     {isVisible('lenovoPn') ? <td>{r.lenovoPn || '—'}</td> : null}
                     {isVisible('customerPn') ? <td>{r.customerPn || '—'}</td> : null}
                     {isVisible('manufacturer') ? <td>{r.manufacturer || '—'}</td> : null}
