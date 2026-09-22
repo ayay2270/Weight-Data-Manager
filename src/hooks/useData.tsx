@@ -100,6 +100,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         status: 'Draft',
         reviewedBy: null,
         reviewedDate: null,
+        reviewComment: null,
         createdAt: stamp,
         updatedAt: stamp,
       }

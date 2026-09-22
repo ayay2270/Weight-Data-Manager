@@ -1,12 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  CheckCircle2,
-  Clock3,
-  Database,
-  FolderKanban,
-  Plus,
-} from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
@@ -33,10 +27,6 @@ export function ProjectsPage() {
     status: 'Active' as Project['status'],
     notes: '',
   })
-
-  const activeProjects = useMemo(() => projects.filter((p) => p.status === 'Active'), [projects])
-  const pendingReviewCount = records.filter((r) => r.status === 'Pending Review').length
-  const verifiedCount = records.filter((r) => r.status === 'Verified').length
 
   const phaseOptions = useMemo(() => {
     return [...new Set(projects.map((p) => p.phase).filter(Boolean) as string[])].sort()
@@ -111,45 +101,6 @@ export function ProjectsPage() {
         }
       />
       <div className="content">
-        <div className="cards dashboard-summary-cards">
-          <div className="card blue dashboard-summary-card">
-            <div className="dashboard-summary-icon">
-              <FolderKanban size={18} />
-            </div>
-            <div>
-              <span>Active Projects</span>
-              <strong>{activeProjects.length}</strong>
-            </div>
-          </div>
-          <div className="card slate dashboard-summary-card">
-            <div className="dashboard-summary-icon">
-              <Database size={18} />
-            </div>
-            <div>
-              <span>Total Records</span>
-              <strong>{records.length}</strong>
-            </div>
-          </div>
-          <div className="card amber dashboard-summary-card">
-            <div className="dashboard-summary-icon">
-              <Clock3 size={18} />
-            </div>
-            <div>
-              <span>Pending Review</span>
-              <strong>{pendingReviewCount}</strong>
-            </div>
-          </div>
-          <div className="card green dashboard-summary-card">
-            <div className="dashboard-summary-icon">
-              <CheckCircle2 size={18} />
-            </div>
-            <div>
-              <span>Verified</span>
-              <strong>{verifiedCount}</strong>
-            </div>
-          </div>
-        </div>
-
         <div className="filter-bar">
           <input
             placeholder="Search project code or description..."

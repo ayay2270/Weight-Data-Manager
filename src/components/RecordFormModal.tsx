@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
 import { DATA_SOURCES, LEVELS, RECORD_STATUSES } from '../data/types'
 import { nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
@@ -34,6 +34,7 @@ const emptyForm = {
   status: 'Draft' as RecordStatus,
   reviewedBy: '',
   reviewedDate: '',
+  reviewComment: '',
   note: '',
 }
 
@@ -48,6 +49,8 @@ export function RecordFormModal({
 }: RecordFormModalProps) {
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const descriptionRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -72,6 +75,7 @@ export function RecordFormModal({
         status: initial.status,
         reviewedBy: initial.reviewedBy || '',
         reviewedDate: initial.reviewedDate || '',
+        reviewComment: initial.reviewComment || '',
         note: initial.note || '',
       })
     } else {
@@ -87,6 +91,7 @@ export function RecordFormModal({
       })
     }
     setError(null)
+    setSuccess(null)
   }, [open, initial, defaultProjectId, defaultUnit, projects])
 
   const showPartFields = form.level === 'Part' || form.level === 'Node' || form.level === 'Rack'
@@ -131,7 +136,7 @@ export function RecordFormModal({
     }))
   }
 
-  function handleSave() {
+  function handleSave(addNext = false) {
     const project = projects.find((p) => p.id === form.projectId)
     if (!project) {
       setError('Please select a project.')
@@ -182,12 +187,29 @@ export function RecordFormModal({
       status: form.status,
       reviewedBy: form.reviewedBy.trim() || null,
       reviewedDate: form.reviewedDate || null,
+      reviewComment: form.reviewComment.trim() || null,
       note: form.note.trim() || null,
       originalWeightText: initial?.originalWeightText || null,
       createdAt: initial?.createdAt || stamp,
       updatedAt: stamp,
     })
-    onClose()
+    if (!addNext || initial) {
+      onClose()
+      return
+    }
+    setForm((prev) => ({
+      ...emptyForm,
+      projectId: prev.projectId,
+      buildPhase: prev.buildPhase,
+      level: prev.level,
+      source: prev.source,
+      measuredBy: prev.measuredBy,
+      measuredDate: prev.measuredDate,
+      weightUnit: prev.level === 'Part' ? 'g' : prev.weightUnit,
+    }))
+    setError(null)
+    setSuccess('Record saved.')
+    window.setTimeout(() => descriptionRef.current?.focus(), 0)
   }
 
   return (
@@ -199,13 +221,15 @@ export function RecordFormModal({
           <button type="button" className="button secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="button" onClick={handleSave}>
-            Save Record
+          <button type="button" className="button" onClick={() => handleSave()}>
+            Save
           </button>
+          {!initial ? <button type="button" className="button" onClick={() => handleSave(true)}>Save & Add Next</button> : null}
         </>
       }
     >
       {error ? <div className="alert error">{error}</div> : null}
+      {success ? <div className="alert success">{success}</div> : null}
       <div className="form-grid">
         <label>
           Project
@@ -240,6 +264,7 @@ export function RecordFormModal({
         <label className="span-2">
           Part Description
           <input
+            ref={descriptionRef}
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Part / node / rack / package description"
@@ -383,6 +408,15 @@ export function RecordFormModal({
             type="date"
             value={form.reviewedDate}
             onChange={(e) => setForm({ ...form, reviewedDate: e.target.value })}
+          />
+        </label>
+        <label className="span-2">
+          Review Comment
+          <textarea
+            rows={2}
+            maxLength={500}
+            value={form.reviewComment}
+            onChange={(e) => setForm({ ...form, reviewComment: e.target.value })}
           />
         </label>
 

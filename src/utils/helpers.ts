@@ -103,6 +103,7 @@ export function normalizeWeightRecord<T extends Partial<WeightRecord>>(record: T
     measuredDate: record.measuredDate ?? null,
     reviewedBy: record.reviewedBy ?? null,
     reviewedDate: record.reviewedDate ?? null,
+    reviewComment: record.reviewComment ?? null,
     source,
     status: migrated.status,
   } as T & WeightRecord

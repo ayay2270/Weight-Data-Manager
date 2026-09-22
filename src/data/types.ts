@@ -68,6 +68,7 @@ export interface WeightRecord {
   status: RecordStatus
   reviewedBy?: string | null
   reviewedDate?: string | null
+  reviewComment?: string | null
   note?: string | null
   originalWeightText?: string | null
   createdAt: string

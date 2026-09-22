@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, Columns3, Copy, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Columns3, Copy, Pencil, Plus, RotateCcw, Trash2, X, ArrowDown, ArrowUp, ArrowUpDown, Save } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { RecordFormModal } from '../components/RecordFormModal'
+import { ReviewRecordModal } from '../components/ReviewRecordModal'
+import { Modal } from '../components/Modal'
 import { useData } from '../hooks/useData'
-import type { Level, RecordStatus, WeightRecord } from '../data/types'
+import type { Level, WeightRecord } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
-import { formatWeightKg, statusBadgeClass, todayDate } from '../utils/helpers'
+import { formatWeightKg, getWeightKg, statusBadgeClass } from '../utils/helpers'
 
 type ColumnKey =
   | 'project'
@@ -24,9 +26,12 @@ type ColumnKey =
   | 'measuredBy'
   | 'status'
   | 'reviewedBy'
+  | 'reviewComment'
+  | 'updated'
   | 'actions'
 
 const COLUMN_STORAGE_KEY = 'weightDataVisibleColumns'
+const VIEWS_STORAGE_KEY = 'weightDataSavedViews'
 const PAGE_SIZE = 15
 
 const COLUMN_OPTIONS: { key: ColumnKey; label: string; locked?: boolean }[] = [
@@ -45,6 +50,8 @@ const COLUMN_OPTIONS: { key: ColumnKey; label: string; locked?: boolean }[] = [
   { key: 'measuredBy', label: 'Measured By' },
   { key: 'status', label: 'Status' },
   { key: 'reviewedBy', label: 'Reviewed By' },
+  { key: 'reviewComment', label: 'Review Comment' },
+  { key: 'updated', label: 'Updated' },
   { key: 'actions', label: 'Actions' },
 ]
 
@@ -58,8 +65,29 @@ const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   'note',
   'source',
   'status',
+  'reviewedBy',
+  'reviewComment',
   'actions',
 ]
+
+type SortKey = 'project' | 'description' | 'weight' | 'measuredDate' | 'status' | 'updated'
+type SortDirection = 'asc' | 'desc'
+type SavedView = {
+  id: string
+  name: string
+  isDefault?: boolean
+  state: {
+    query: string
+    projectFilter: string
+    levelFilter: Level | ''
+    statusFilter: string
+    sourceFilter: string
+    buildPhaseFilter: string
+    visibleColumns: ColumnKey[]
+    sortKey: SortKey | null
+    sortDirection: SortDirection | null
+  }
+}
 
 function loadVisibleColumns(): ColumnKey[] {
   try {
@@ -75,6 +103,21 @@ function loadVisibleColumns(): ColumnKey[] {
   }
 }
 
+function loadSavedViews(): SavedView[] {
+  try {
+    const raw = localStorage.getItem(VIEWS_STORAGE_KEY)
+    const parsed = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(parsed) ? (parsed as SavedView[]) : []
+  } catch {
+    return []
+  }
+}
+
+function commentPreview(comment?: string | null): string {
+  if (!comment) return '—'
+  return comment.length > 28 ? `${comment.slice(0, 28)}…` : comment
+}
+
 export function WeightDataPage() {
   const { projects, records, settings, upsertRecord, deleteRecord, duplicateRecord } = useData()
   const [params] = useSearchParams()
@@ -86,9 +129,16 @@ export function WeightDataPage() {
   const [buildPhaseFilter, setBuildPhaseFilter] = useState('')
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(loadVisibleColumns)
   const [columnsOpen, setColumnsOpen] = useState(false)
+  const [savedViews, setSavedViews] = useState<SavedView[]>(loadSavedViews)
+  const [selectedViewId, setSelectedViewId] = useState('all')
+  const [showManageViews, setShowManageViews] = useState(false)
+  const [newViewName, setNewViewName] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection | null>(null)
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<WeightRecord | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
 
   const buildPhaseOptions = useMemo(() => {
     const values = new Set<string>()
@@ -128,8 +178,26 @@ export function WeightDataPage() {
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q))
       })
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  }, [records, levelFilter, projectFilter, statusFilter, sourceFilter, buildPhaseFilter, query])
+      .sort((a, b) => {
+        if (!sortKey || !sortDirection) return b.updatedAt.localeCompare(a.updatedAt)
+        const direction = sortDirection === 'asc' ? 1 : -1
+        const field = (record: WeightRecord): string | number => {
+          switch (sortKey) {
+            case 'project': return record.projectCode || ''
+            case 'description': return record.description || ''
+            case 'weight': return getWeightKg(record) ?? -1
+            case 'measuredDate': return record.measuredDate || ''
+            case 'status': return record.status || ''
+            case 'updated': return record.updatedAt || ''
+          }
+        }
+        const left = field(a)
+        const right = field(b)
+        return typeof left === 'number' && typeof right === 'number'
+          ? (left - right) * direction
+          : String(left).localeCompare(String(right)) * direction
+      })
+  }, [records, levelFilter, projectFilter, statusFilter, sourceFilter, buildPhaseFilter, query, sortKey, sortDirection])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
@@ -147,6 +215,82 @@ export function WeightDataPage() {
     updateVisibleColumns(isVisible(key) ? visibleColumns.filter((column) => column !== key) : [...visibleColumns, key])
   }
 
+  function currentViewState(): SavedView['state'] {
+    return { query, projectFilter, levelFilter, statusFilter, sourceFilter, buildPhaseFilter, visibleColumns, sortKey, sortDirection }
+  }
+
+  function persistViews(next: SavedView[]) {
+    setSavedViews(next)
+    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(next))
+  }
+
+  function applyView(viewId: string) {
+    setSelectedViewId(viewId)
+    if (viewId === 'all') {
+      setQuery('')
+      setProjectFilter('')
+      setLevelFilter('')
+      setStatusFilter('')
+      setSourceFilter('')
+      setBuildPhaseFilter('')
+      setSortKey(null)
+      setSortDirection(null)
+      updateVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+      setPage(1)
+      return
+    }
+    const view = savedViews.find((item) => item.id === viewId)
+    if (!view) return
+    const state = view.state
+    setQuery(state.query)
+    setProjectFilter(state.projectFilter)
+    setLevelFilter(state.levelFilter)
+    setStatusFilter(state.statusFilter)
+    setSourceFilter(state.sourceFilter)
+    setBuildPhaseFilter(state.buildPhaseFilter)
+    setSortKey(state.sortKey)
+    setSortDirection(state.sortDirection)
+    updateVisibleColumns(state.visibleColumns)
+    setPage(1)
+  }
+
+  function saveCurrentView() {
+    const name = newViewName.trim()
+    if (!name) return
+    const view: SavedView = { id: crypto.randomUUID(), name, state: currentViewState() }
+    persistViews([...savedViews, view])
+    setSelectedViewId(view.id)
+    setNewViewName('')
+  }
+
+  function cycleSort(key: SortKey) {
+    setPage(1)
+    if (sortKey !== key) {
+      setSortKey(key)
+      setSortDirection('asc')
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc')
+    } else {
+      setSortKey(null)
+      setSortDirection(null)
+    }
+  }
+
+  function sortIcon(key: SortKey) {
+    if (sortKey !== key) return <ArrowUpDown size={13} />
+    return sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+  }
+
+  function sortableHeader(label: string, key: SortKey, className?: string) {
+    return (
+      <th className={className}>
+        <button type="button" className="sort-header" onClick={() => cycleSort(key)}>
+          {label} {sortIcon(key)}
+        </button>
+      </th>
+    )
+  }
+
   function openAdd() {
     setEditing(null)
     setShowForm(true)
@@ -155,25 +299,6 @@ export function WeightDataPage() {
   function openEdit(record: WeightRecord) {
     setEditing(record)
     setShowForm(true)
-  }
-
-  function applyReview(record: WeightRecord, status: RecordStatus) {
-    if (status === 'Verified') {
-      const reviewedBy = window.prompt('Reviewed By (required for Verified):', record.reviewedBy || '')
-      if (reviewedBy == null) return
-      if (!reviewedBy.trim()) {
-        window.alert('Reviewed By is required when Status is Verified.')
-        return
-      }
-      upsertRecord({
-        ...record,
-        status,
-        reviewedBy: reviewedBy.trim(),
-        reviewedDate: record.reviewedDate || todayDate(),
-      })
-      return
-    }
-    upsertRecord({ ...record, status })
   }
 
   return (
@@ -188,6 +313,28 @@ export function WeightDataPage() {
         }
       />
       <div className="content">
+        <div className="saved-views-bar">
+          <label>
+            Saved Views
+            <select value={selectedViewId} onChange={(e) => applyView(e.target.value)}>
+              <option value="all">All Records (Default)</option>
+              {savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}{view.isDefault ? ' (Default)' : ''}</option>)}
+            </select>
+          </label>
+          <input
+            className="saved-view-name"
+            value={newViewName}
+            onChange={(e) => setNewViewName(e.target.value)}
+            placeholder="New view name"
+            aria-label="New saved view name"
+          />
+          <button type="button" className="button secondary" disabled={!newViewName.trim()} onClick={saveCurrentView}>
+            <Save size={15} /> Save Current View
+          </button>
+          <button type="button" className="button secondary" onClick={() => setShowManageViews(true)}>
+            Manage Views
+          </button>
+        </div>
         <div className="filter-bar">
           <input
             placeholder="Search description, PN, people, config, supplier…"
@@ -307,21 +454,23 @@ export function WeightDataPage() {
             <table>
               <thead>
                 <tr>
-                  {isVisible('project') ? <th className="weight-table-project">Project</th> : null}
-                  {isVisible('description') ? <th className="weight-table-description">Description</th> : null}
+                  {isVisible('project') ? sortableHeader('Project', 'project', 'weight-table-project') : null}
+                  {isVisible('description') ? sortableHeader('Description', 'description', 'weight-table-description') : null}
                   {isVisible('lenovoPn') ? <th>Lenovo PN</th> : null}
                   {isVisible('customerPn') ? <th>MSFT PN</th> : null}
                   {isVisible('manufacturer') ? <th>Manufacturer</th> : null}
                   {isVisible('category') ? <th>Part Category</th> : null}
                   {isVisible('buildPhase') ? <th>Build / Phase</th> : null}
                   {isVisible('level') ? <th>Level</th> : null}
-                  {isVisible('weight') ? <th>Weight (kg)</th> : null}
-                  {isVisible('measuredDate') ? <th>Measured Date</th> : null}
+                  {isVisible('weight') ? sortableHeader('Weight (kg)', 'weight') : null}
+                  {isVisible('measuredDate') ? sortableHeader('Measured Date', 'measuredDate') : null}
                   {isVisible('note') ? <th>Note</th> : null}
                   {isVisible('source') ? <th>Source</th> : null}
                   {isVisible('measuredBy') ? <th>Measured By</th> : null}
-                  {isVisible('status') ? <th>Status</th> : null}
+                  {isVisible('status') ? sortableHeader('Status', 'status') : null}
                   {isVisible('reviewedBy') ? <th>Reviewed By</th> : null}
+                  {isVisible('reviewComment') ? <th>Review Comment</th> : null}
+                  {isVisible('updated') ? sortableHeader('Updated', 'updated') : null}
                   {isVisible('actions') ? <th>Actions</th> : null}
                 </tr>
               </thead>
@@ -351,6 +500,8 @@ export function WeightDataPage() {
                       <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
                     </td> : null}
                     {isVisible('reviewedBy') ? <td>{r.reviewedBy || '—'}</td> : null}
+                    {isVisible('reviewComment') ? <td className="review-comment" title={r.reviewComment || undefined}>{commentPreview(r.reviewComment)}</td> : null}
+                    {isVisible('updated') ? <td>{r.updatedAt.slice(0, 10)}</td> : null}
                     {isVisible('actions') ? <td>
                       <div className="row-actions">
                         {r.status === 'Pending Review' ? (
@@ -359,7 +510,7 @@ export function WeightDataPage() {
                               type="button"
                               className="button ghost"
                               title="Verify"
-                              onClick={() => applyReview(r, 'Verified')}
+                              onClick={() => setReviewing(r)}
                             >
                               <Check size={15} />
                             </button>
@@ -367,7 +518,7 @@ export function WeightDataPage() {
                               type="button"
                               className="button ghost"
                               title="Need Recheck"
-                              onClick={() => applyReview(r, 'Need Recheck')}
+                              onClick={() => setReviewing(r)}
                             >
                               <RotateCcw size={15} />
                             </button>
@@ -375,7 +526,7 @@ export function WeightDataPage() {
                               type="button"
                               className="button ghost"
                               title="Reject"
-                              onClick={() => applyReview(r, 'Rejected')}
+                              onClick={() => setReviewing(r)}
                             >
                               <X size={15} />
                             </button>
@@ -446,6 +597,45 @@ export function WeightDataPage() {
         onClose={() => setShowForm(false)}
         onSave={upsertRecord}
       />
+      <ReviewRecordModal key={reviewing?.id || 'none'} record={reviewing} onClose={() => setReviewing(null)} onSave={upsertRecord} />
+      {showManageViews ? (
+        <Modal
+          title="Manage Saved Views"
+          onClose={() => setShowManageViews(false)}
+          footer={<button type="button" className="button secondary" onClick={() => setShowManageViews(false)}>Close</button>}
+        >
+          <div className="saved-views-manager">
+            <div className="saved-view-row locked"><strong>All Records</strong><span className="muted">Default · always available</span></div>
+            {savedViews.map((view) => (
+              <div className="saved-view-row" key={view.id}>
+                <input
+                  value={view.name}
+                  onChange={(e) => persistViews(savedViews.map((item) => item.id === view.id ? { ...item, name: e.target.value } : item))}
+                />
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => persistViews(savedViews.map((item) => ({ ...item, isDefault: item.id === view.id })))}
+                >
+                  {view.isDefault ? 'Default' : 'Set Default'}
+                </button>
+                <button
+                  type="button"
+                  className="button danger"
+                  onClick={() => {
+                    const next = savedViews.filter((item) => item.id !== view.id)
+                    persistViews(next)
+                    if (selectedViewId === view.id) applyView('all')
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+            {!savedViews.length ? <div className="empty">No saved views yet.</div> : null}
+          </div>
+        </Modal>
+      ) : null}
     </>
   )
 }
