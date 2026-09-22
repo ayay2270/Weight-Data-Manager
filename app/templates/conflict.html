@@ -1,2 +1,0 @@
-{% extends "base.html" %}{% block live %}false{% endblock %}{% block heading %}Update conflict{% endblock %}{% block subheading %}Your changes were not saved{% endblock %}{% block content %}<div class="panel narrow"><div class="alert warning"><strong>This record has been updated by another user.</strong><br>Latest version: {{record.version}}, updated by {{record.updated_by}} at {{record.updated_at.strftime('%Y-%m-%d %H:%M:%S')}}.</div><a class="button" href="/records/{{record.id}}/edit">Reload Latest Data</a></div>{% endblock %}
-

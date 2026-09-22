@@ -1,19 +1,23 @@
-.venv/
-__pycache__/
-.pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
-*.pyc
-*.pyo
-server.log
+# Logs
+logs
 *.log
-logs/
-backups/
-data/*.db
-data/*.db-wal
-data/*.db-shm
-build/
-dist/
-*.spec.bak
-Weight-Data-Manager-Windows.zip
+npm-debug.log*
+
+# Runtime
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Python leftovers (legacy)
+.venv
+__pycache__
+*.pyc
+.env
+*.spec

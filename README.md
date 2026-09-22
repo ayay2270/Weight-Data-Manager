@@ -1,127 +1,90 @@
-# Weight Data Manager — One-click Department Deployment
+# Weight Data Manager
 
-Weight Data Manager is a department-shared web application. One designated Windows Host PC runs the application; everyone else uses Edge or Chrome and sees the same central data.
+Browser-based engineering weight database for Part / Node / Rack / Package measurements. Teams track collection progress per project, import Excel/CSV workbooks, and keep data locally in the browser (JSON + LocalStorage). No backend server is required for V1.
 
-## Release folder
+## Purpose
 
-After `build_release.bat`, deploy the folder `dist\Weight Data Manager`. Outer layer:
+Replace scattered Excel weight logs with a shared-style web app that:
 
-```text
-Weight Data Manager.exe
-README.md
-_internal\          (required PyInstaller onedir runtime — do not delete)
-```
+- Normalizes Part (g), Node / Rack / Package (kg) records
+- Shows project collection progress and completeness (Collected ÷ Expected)
+- Supports add / edit / delete / duplicate workflows
+- Imports the existing Weight Measurement Record X01 workbook
+- Exports Excel, CSV, and JSON backups
 
-There is no separate First Time Setup executable. Network setup runs inside `Weight Data Manager.exe` on first launch only when needed. Operational data is **not** stored in this folder by default.
+## Users
 
-One-file packaging was evaluated and not used: onedir starts more reliably with templates/static assets and is easier for antivirus and upgrades.
+- Mechanical / packaging / system engineers collecting weights
+- Project leads reviewing completeness by Part / Node / Rack / Package
+- Anyone who previously maintained `Weight Measurement Record_X01.xlsx`
 
-## Normal daily use (Host PC)
+## Typical workflow
 
-1. Double-click `Weight Data Manager.exe`.
-2. Keep the small status window open — closing it stops the shared server.
-3. Confirm **● Running**.
-4. Use **Open** or **Copy Link** for the Department URL (`http://HOSTNAME:8000`, with IP as fallback when needed).
-5. Database, backup, firewall, paths, port, and server details stay under **Show Details**.
+1. Open the Web App (or run locally).
+2. Review **Dashboard** progress bars and recent records.
+3. Open **Projects** to set expected item counts (completeness targets).
+4. Enter or edit rows in **Weight Data**.
+5. Use **Import / Export** for Excel/CSV hand-off.
+6. Use **Settings** for defaults, JSON backup, or reset demo data.
 
-Normal users do not run PowerShell, BAT files, Python, or manual backups.
+## Stack
 
-The Host PC must stay powered on, on the company network, and awake while colleagues are using the system.
+- React 19 + TypeScript + Vite
+- React Router
+- Recharts
+- SheetJS (`xlsx`) for Excel/CSV
+- LocalStorage persistence (no auth, no server)
 
-## First launch (Host PC only)
+Future Supabase / SharePoint hooks can attach to the same Project / WeightRecord model without changing V1 UI contracts.
 
-1. Copy the entire release folder to a stable local path, for example `C:\DepartmentApps\Weight Data Manager`.
-2. Double-click `Weight Data Manager.exe`.
-3. If the firewall rule is already present, the app starts normally with no setup UI.
-4. If the rule is missing, the window shows **First-time network setup is required.** Click **Start Setup** and approve the Windows administrator prompt. The app creates an inbound allow rule for TCP 8000 on Domain and Private networks only, then continues launching.
-5. If company policy blocks the change, the app shows **Network setup requires IT assistance.** with the inbound TCP 8000 / Domain / Private requirement. Daily local use still continues; colleagues need IT to finish the rule.
-6. Later launches never show the setup panel again.
-
-Equivalent IT rule (optional central deployment):
-
-```powershell
-New-NetFirewallRule -DisplayName "Weight Data Manager TCP 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Domain,Private
-```
-
-Do not enable the Public profile unless company IT explicitly approves it. This product never disables Windows Firewall.
-
-## Data and automatic backup
-
-Frozen builds store operational files under:
+## Repository structure
 
 ```text
-%LOCALAPPDATA%\Weight Data Manager\data\weight_manager.db
-%LOCALAPPDATA%\Weight Data Manager\backups\weight_manager_YYYY-MM-DD_HHMMSS.db
-%LOCALAPPDATA%\Weight Data Manager\logs\server.log
+src/
+  components/   Sidebar, modal, progress, record form
+  pages/        Dashboard, Projects, Weight Data, Import/Export, Settings
+  data/         types + seed.json (normalized from X01)
+  hooks/        LocalStorage data provider
+  utils/        completeness helpers, Excel/CSV IO, storage
+public/sample/  Sample X01 workbook for import testing
+data/           Original Excel source file
 ```
 
-That keeps the department database safe when someone replaces the release folder during an upgrade. If an older install still has `data\weight_manager.db` beside the EXE and AppData does not yet have a database, the launcher copies it into AppData once on first start.
+## Local development
 
-On the first successful start of each day, the launcher uses SQLite's online backup API, verifies the backup with `PRAGMA integrity_check`, and keeps the newest 30 backups. Same-day restarts do not create another backup.
-
-For Host PC disk-failure protection, IT may copy the `backups` folder to an approved protected location. Do not put the live SQLite database on a shared network folder.
-
-## Restore a backup
-
-1. Close the Weight Data Manager status window and confirm the application has stopped.
-2. Preserve the current `weight_manager.db` under another filename.
-3. Copy the selected verified backup into `data\weight_manager.db` (under the AppData path above, unless you are on a developer checkout).
-4. Start `Weight Data Manager.exe` and check the Dashboard and several records.
-
-If `weight_manager.db-wal` or `weight_manager.db-shm` remains after shutdown, ask support to confirm no server process is running before restoring.
-
-## Shared-operation behavior
-
-- The Host listens on all interfaces, port 8000; browsers use one central SQLite database.
-- List pages poll for updates approximately every seven seconds.
-- Optimistic locking prevents silent overwrites.
-- SQLite uses WAL mode, a busy timeout, and short transactions.
-- Browser Local Storage remembers user names for audit fields (identification, not authentication).
-- `/health` reports application and database status.
-
-## Troubleshooting
-
-- Local browser will not open: close all Weight Data Manager windows and start once more.
-- Colleagues cannot connect: same company network, and the inbound TCP 8000 Domain/Private rule must exist (Ask IT if first-launch setup was blocked).
-- Hostname URL fails on another PC: use the Fallback IP under **Show Details** and ask IT about internal hostname resolution.
-- Details and log path: click **Show Details**.
-- Port 8000 must be free.
-
-## Official Windows build (maintainers)
-
-Normal department use does **not** need local Python. The official Windows EXE is produced by GitHub Actions.
-
-1. Push to `main`, or open **Actions** → **Build Windows** → **Run workflow**.
-2. Wait for the latest successful run.
-3. Open the run → **Artifacts** → download **Weight-Data-Manager-Windows**.
-4. Unpack `Weight-Data-Manager-Windows.zip` and deploy the `Weight Data Manager` folder to the Host PC.
-
-Department users only double-click `Weight Data Manager.exe`. First-launch firewall setup (if needed) runs inside that EXE via UAC — there is no separate setup EXE and no Python/BAT/PowerShell/CMD for daily use.
-
-## Local rebuild (optional maintainers only)
-
-Department Host PC users never use these steps.
-
-**Sole local Windows build entry** (build machine with Python 3.11+ on PATH):
-
-```text
-build_release.bat
+```bash
+npm install
+npm run dev
 ```
 
-That script checks for Python, creates `.venv`, installs requirements + PyInstaller, and builds `dist\Weight Data Manager\`. If Python is missing it prints **BUILD FAILED**, exits non-zero, and does not claim success. It runs non-interactively (suitable for CI).
+Dev server: [http://127.0.0.1:43122/Weight-Data-Manager/](http://127.0.0.1:43122/Weight-Data-Manager/)
 
-Optional maintainer checks after a successful local build (requires the `.venv` from `build_release.bat`):
-
-```text
-run_tests.bat
+```bash
+npm run build
+npm run preview
 ```
 
-Developer server without the Tk launcher (maintainer Python checkout only):
+Preview server: [http://127.0.0.1:43123/Weight-Data-Manager/](http://127.0.0.1:43123/Weight-Data-Manager/)
 
-```text
-.venv\Scripts\python.exe start_server.py
-```
+## Deployment (GitHub Pages)
 
-Prefer the GitHub Actions artifact for department deployment. Local `build_release.bat` is for maintainers who need an offline rebuild.
+- Branch: `main`
+- Workflow: `.github/workflows/deploy-pages.yml`
+- Site is published from the Vite `dist/` output with base `/Weight-Data-Manager/`
 
-Version 1 intentionally does not include login, SSO, roles, Docker, cloud deployment, Teams/email notification, PLM/BOM integration, or CAE calculations.
+## URLs
+
+- **Web App:** https://ayay2270.github.io/Weight-Data-Manager/
+- **GitHub:** https://github.com/ayay2270/Weight-Data-Manager
+
+## Data notes
+
+- Completeness = records with status Measured or Verified (and a weight) ÷ project `expectedItems`
+- Expected counts are editable per project in the Projects UI — not hardcoded in dashboard widgets
+- Source values: Internal Measurement, Supplier, Specification, Estimated, Unknown
+- Status values: Draft, Measured, Verified, Estimated, Missing
+- UI language: Traditional Chinese / English only (no Simplified Chinese chrome or README)
+
+## License / scope
+
+V1 intentionally excludes login, shared server databases, Windows EXE packaging, and firewall tooling. Data lives in the user’s browser until exported.
