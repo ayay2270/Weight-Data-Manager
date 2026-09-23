@@ -20,6 +20,11 @@ export function statusBadgeClass(status: string): string {
   return status.replace(/\s+/g, '-')
 }
 
+/** Tester may change measurement data only while the record is Draft or Need Recheck. */
+export function canEditMeasurement(status: string): boolean {
+  return status === 'Draft' || status === 'Need Recheck'
+}
+
 const DATA_SOURCE_SET = new Set<string>(DATA_SOURCES)
 const RECORD_STATUS_SET = new Set<string>(RECORD_STATUSES)
 

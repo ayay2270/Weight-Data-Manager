@@ -8,7 +8,6 @@ import type { Project, RecordStatus } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
 import {
   countByLevel,
-  emptyExpected,
   formatDate,
   formatWeightKg,
   nowIso,
@@ -83,7 +82,6 @@ export function ProjectDetailPage() {
       name: form.name.trim(),
       phase: form.phase.trim() || null,
       status: form.status,
-      expectedItems: project.expectedItems ? { ...project.expectedItems } : emptyExpected(),
       notes: form.notes.trim() || null,
       updatedAt: nowIso(),
     })

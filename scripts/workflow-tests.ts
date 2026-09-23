@@ -213,6 +213,20 @@ assertTruthy(exported.includes('Bromake'), 'export includes supplier value')
 
 // Legacy expectedItems still loads without breaking normalize
 assertTruthy(legacy.projects[0].expectedItems, 'legacy expectedItems retained for compatibility')
+const withoutExpected = normalizeAppData({
+  ...base,
+  projects: [
+    {
+      id: 'prj_new',
+      code: 'NEW',
+      name: 'New project',
+      status: 'Active',
+      createdAt: '',
+      updatedAt: '',
+    },
+  ],
+})
+assertEqual('expectedItems' in withoutExpected.projects[0], false, 'new project does not gain expectedItems')
 
 // Duplicate detection
 const dupBase: WeightRecord[] = [

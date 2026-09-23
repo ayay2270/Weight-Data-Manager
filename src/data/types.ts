@@ -38,8 +38,11 @@ export interface Project {
   name: string
   phase?: string | null
   status: ProjectStatus
-  /** @deprecated Legacy field kept so older LocalStorage payloads still load. Not shown in UI. */
-  expectedItems: ExpectedItems
+  /**
+   * Optional legacy field from older LocalStorage payloads.
+   * New projects do not write this field. Not used by the UI.
+   */
+  expectedItems?: ExpectedItems
   notes?: string | null
   createdAt: string
   updatedAt: string

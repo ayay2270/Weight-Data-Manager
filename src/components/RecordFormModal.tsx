@@ -201,20 +201,35 @@ export function RecordFormModal({
       return null
     }
 
-    const resolved = resolveStatus(intent)
-    if (resolved.status === 'Pending Review' && (weightValue == null || weightValue <= 0)) {
-      setError('Pending Review records need a weight greater than zero.')
+    if (initial && initial.status !== 'Draft' && initial.status !== 'Need Recheck') {
+      setError('This record cannot be edited in its current status.')
       return null
     }
 
-    if (
-      (intent === 'submit' || intent === 'resubmit') &&
-      configRule === 'required' &&
-      configEmpty
-    ) {
-      setError('Please specify what is included in this rack.')
-      return null
+    if (intent === 'submit' || intent === 'resubmit') {
+      if (weightValue == null || !(weightValue > 0)) {
+        setError('Weight must be greater than zero before submitting for review.')
+        return null
+      }
+      if (!form.measuredBy.trim()) {
+        setError('Measured By is required before submitting for review.')
+        return null
+      }
+      if (!form.measuredDate) {
+        setError('Measured Date is required before submitting for review.')
+        return null
+      }
+      if (configRule === 'required' && configEmpty) {
+        setError('Please specify what is included in this rack.')
+        return null
+      }
+      if (form.source === 'Supplier' && !form.supplier.trim()) {
+        setError('Supplier / Data Provider is required before submitting for review when Source is Supplier.')
+        return null
+      }
     }
+
+    const resolved = resolveStatus(intent)
 
     const stamp = nowIso()
     return {

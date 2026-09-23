@@ -1,6 +1,6 @@
 import seed from '../data/seed.json'
 import type { AppData } from '../data/types'
-import { emptyExpected, normalizeWeightRecord } from './helpers'
+import { normalizeWeightRecord } from './helpers'
 
 const STORAGE_KEY = 'wdm.v1.appData'
 
@@ -11,11 +11,11 @@ export function loadSeed(): AppData {
 export function normalizeAppData(data: AppData): AppData {
   return {
     ...data,
-    projects: (data.projects || []).map((project) => ({
-      ...project,
-      // Legacy field: keep if present, otherwise default empty so old payloads still load.
-      expectedItems: project.expectedItems ?? emptyExpected(),
-    })),
+    projects: (data.projects || []).map((project) => {
+      const next = { ...project }
+      if (next.expectedItems == null) delete next.expectedItems
+      return next
+    }),
     records: data.records.map((record) => normalizeWeightRecord(record)),
   }
 }

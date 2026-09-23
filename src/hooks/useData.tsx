@@ -9,6 +9,31 @@ import {
 } from 'react'
 import type { AppData, AppSettings, Project, WeightRecord } from '../data/types'
 import { normalizeWeightRecord, nowIso, uid } from '../utils/helpers'
+
+const LOCKED_MEASUREMENT_STATUSES = new Set(['Pending Review', 'Verified', 'Rejected'])
+
+function measurementUnchanged(existing: WeightRecord, next: WeightRecord): boolean {
+  const keys: (keyof WeightRecord)[] = [
+    'projectId',
+    'level',
+    'description',
+    'lenovoPn',
+    'customerPn',
+    'manufacturer',
+    'category',
+    'weightValue',
+    'weightUnit',
+    'buildPhase',
+    'configuration',
+    'supplier',
+    'reference',
+    'measuredBy',
+    'measuredDate',
+    'source',
+    'note',
+  ]
+  return keys.every((key) => (existing[key] ?? null) === (next[key] ?? null))
+}
 import { clearAppData, loadAppData, loadSeed, normalizeAppData, saveAppData } from '../utils/storage'
 
 interface DataContextValue {
@@ -43,11 +68,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const upsertProject = useCallback((project: Project) => {
     setData((prev) => {
-      const exists = prev.projects.some((p) => p.id === project.id)
-      const projects = exists
-        ? prev.projects.map((p) => (p.id === project.id ? { ...project, updatedAt: nowIso() } : p))
-        : [...prev.projects, { ...project, createdAt: project.createdAt || nowIso(), updatedAt: nowIso() }]
-      return { ...prev, projects, settings: { ...prev.settings, lastUpdated: nowIso() } }
+      const previous = prev.projects.find((p) => p.id === project.id)
+      const stamp = nowIso()
+      const saved: Project = {
+        ...project,
+        createdAt: project.createdAt || previous?.createdAt || stamp,
+        updatedAt: stamp,
+      }
+      if (saved.expectedItems == null && previous?.expectedItems) {
+        saved.expectedItems = previous.expectedItems
+      }
+      if (saved.expectedItems == null) delete saved.expectedItems
+      const projects = previous
+        ? prev.projects.map((p) => (p.id === project.id ? saved : p))
+        : [...prev.projects, saved]
+      const codeChanged = Boolean(previous && previous.code !== saved.code)
+      const records = codeChanged
+        ? prev.records.map((record) =>
+            record.projectId === saved.id ? { ...record, projectCode: saved.code, updatedAt: stamp } : record,
+          )
+        : prev.records
+      return { ...prev, projects, records, settings: { ...prev.settings, lastUpdated: stamp } }
     })
   }, [])
 
@@ -72,8 +113,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updatedAt: stamp,
         createdAt: record.createdAt || stamp,
       }
-      const exists = prev.records.some((r) => r.id === normalized.id)
-      const records = exists
+      const existing = prev.records.find((r) => r.id === normalized.id)
+      if (
+        existing &&
+        LOCKED_MEASUREMENT_STATUSES.has(existing.status) &&
+        !measurementUnchanged(existing, normalized)
+      ) {
+        return prev
+      }
+      const records = existing
         ? prev.records.map((r) => (r.id === normalized.id ? normalized : r))
         : [...prev.records, normalized]
       return { ...prev, records, settings: { ...prev.settings, lastUpdated: stamp } }

@@ -4,7 +4,7 @@ import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
 import { loadExportContext } from '../utils/exportContext'
 import { downloadBlob } from '../utils/helpers'
-import { exportCsv, exportWorkbook } from '../utils/io'
+import { exportCsv, exportViewCsv, exportViewWorkbook, exportWorkbook } from '../utils/io'
 import type { WeightRecord } from '../data/types'
 
 type ExportScope = 'all' | 'filtered' | 'project' | 'selected'
@@ -20,7 +20,7 @@ export function ExportPage() {
   const [error, setError] = useState<string | null>(null)
 
   const selectedCount = context.selectedIds.length
-  const filteredCount = context.filteredIds.length
+  const filteredCount = context.orderedFilteredRecordIds.length
 
   function resolveRecords(): WeightRecord[] | null {
     if (scope === 'all') return data.records
@@ -29,8 +29,10 @@ export function ExportPage() {
         setError('No Current Filtered View is available. Open Weight Data, apply filters, then return here.')
         return null
       }
-      const idSet = new Set(context.filteredIds)
-      return data.records.filter((r) => idSet.has(r.id))
+      const byId = new Map(data.records.map((record) => [record.id, record]))
+      return context.orderedFilteredRecordIds
+        .map((id) => byId.get(id))
+        .filter((record): record is WeightRecord => Boolean(record))
     }
     if (scope === 'project') {
       if (!projectCode) {
@@ -53,6 +55,23 @@ export function ExportPage() {
     const subset = resolveRecords()
     if (!subset) return
     const stamp = new Date().toISOString().slice(0, 10)
+    if (scope === 'filtered') {
+      if (format === 'xlsx') {
+        downloadBlob(
+          new Blob([exportViewWorkbook(subset, context.visibleColumns)], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }),
+          `weight-data-${stamp}.xlsx`,
+        )
+      } else {
+        downloadBlob(
+          new Blob([exportViewCsv(subset, context.visibleColumns)], { type: 'text/csv;charset=utf-8' }),
+          `weight-data-${stamp}.csv`,
+        )
+      }
+      setMessage(`Exported ${subset.length} record(s) from the current filtered view.`)
+      return
+    }
     if (format === 'xlsx') {
       const buffer = exportWorkbook(data, subset)
       downloadBlob(

@@ -1,14 +1,20 @@
 const EXPORT_CONTEXT_KEY = 'wdm.v1.exportContext'
 
 export type ExportContext = {
-  filteredIds: string[]
+  orderedFilteredRecordIds: string[]
+  visibleColumns: string[]
   selectedIds: string[]
   updatedAt: string
 }
 
-export function saveExportContext(filteredIds: string[], selectedIds: string[]): void {
+export function saveExportContext(
+  orderedFilteredRecordIds: string[],
+  visibleColumns: string[],
+  selectedIds: string[],
+): void {
   const payload: ExportContext = {
-    filteredIds,
+    orderedFilteredRecordIds,
+    visibleColumns,
     selectedIds,
     updatedAt: new Date().toISOString(),
   }
@@ -20,16 +26,28 @@ export function saveExportContext(filteredIds: string[], selectedIds: string[]):
 }
 
 export function loadExportContext(): ExportContext {
+  const empty: ExportContext = {
+    orderedFilteredRecordIds: [],
+    visibleColumns: [],
+    selectedIds: [],
+    updatedAt: '',
+  }
   try {
     const raw = sessionStorage.getItem(EXPORT_CONTEXT_KEY)
-    if (!raw) return { filteredIds: [], selectedIds: [], updatedAt: '' }
-    const parsed = JSON.parse(raw) as ExportContext
+    if (!raw) return empty
+    const parsed = JSON.parse(raw) as Partial<ExportContext> & { filteredIds?: string[] }
+    const ordered = Array.isArray(parsed.orderedFilteredRecordIds)
+      ? parsed.orderedFilteredRecordIds
+      : Array.isArray(parsed.filteredIds)
+        ? parsed.filteredIds
+        : []
     return {
-      filteredIds: Array.isArray(parsed.filteredIds) ? parsed.filteredIds : [],
+      orderedFilteredRecordIds: ordered,
+      visibleColumns: Array.isArray(parsed.visibleColumns) ? parsed.visibleColumns : [],
       selectedIds: Array.isArray(parsed.selectedIds) ? parsed.selectedIds : [],
       updatedAt: parsed.updatedAt || '',
     }
   } catch {
-    return { filteredIds: [], selectedIds: [], updatedAt: '' }
+    return empty
   }
 }

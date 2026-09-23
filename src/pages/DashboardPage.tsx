@@ -19,6 +19,7 @@ import type { Level, RecordStatus, WeightRecord } from '../data/types'
 import { LEVELS } from '../data/types'
 import { useData } from '../hooks/useData'
 import {
+  canEditMeasurement,
   formatWeightKg,
   latestUpdated,
   statusBadgeClass,
@@ -112,6 +113,7 @@ export function DashboardPage() {
   }, [records])
 
   function openEdit(record: WeightRecord) {
+    if (!canEditMeasurement(record.status)) return
     setEditing(record)
   }
 
@@ -213,8 +215,8 @@ export function DashboardPage() {
                             <button type="button" className="button" onClick={() => setReviewing(r)}>
                               Review
                             </button>
-                            <button type="button" className="button ghost" onClick={() => openEdit(r)}>
-                              Edit
+                            <button type="button" className="button ghost" onClick={() => setViewing(r)}>
+                              View
                             </button>
                           </>
                         ) : (

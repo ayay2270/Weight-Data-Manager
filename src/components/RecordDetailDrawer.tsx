@@ -24,6 +24,7 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
 
   const isPending = record.status === 'Pending Review'
   const isRecheck = record.status === 'Need Recheck'
+  const isDraft = record.status === 'Draft'
 
   return (
     <div className="drawer-backdrop" onClick={onClose} role="presentation">
@@ -106,7 +107,7 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
               <RotateCcw size={15} /> Update Measurement
             </button>
           ) : null}
-          {onEdit && !isRecheck ? (
+          {isDraft && onEdit ? (
             <button
               type="button"
               className="button secondary"

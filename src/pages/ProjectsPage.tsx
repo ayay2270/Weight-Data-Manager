@@ -5,7 +5,7 @@ import { Modal } from '../components/Modal'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
 import type { Project } from '../data/types'
-import { emptyExpected, formatDate, nowIso, uid } from '../utils/helpers'
+import { formatDate, nowIso, uid } from '../utils/helpers'
 
 function projectUpdatedAt(project: Project, recordDates: string[]): string {
   const times = [project.updatedAt, ...recordDates].filter(Boolean)
@@ -75,17 +75,18 @@ export function ProjectsPage() {
   function saveProject() {
     if (!form.code.trim() || !form.name.trim()) return
     const stamp = nowIso()
-    upsertProject({
+    const next: Project = {
       id: editing?.id || uid('prj'),
       code: form.code.trim(),
       name: form.name.trim(),
       phase: form.phase.trim() || null,
       status: form.status,
-      expectedItems: editing?.expectedItems ? { ...editing.expectedItems } : emptyExpected(),
       notes: form.notes.trim() || null,
       createdAt: editing?.createdAt || stamp,
       updatedAt: stamp,
-    })
+    }
+    if (editing?.expectedItems) next.expectedItems = { ...editing.expectedItems }
+    upsertProject(next)
     setShowForm(false)
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Check,
@@ -25,7 +25,7 @@ import { useData } from '../hooks/useData'
 import type { Level, WeightRecord } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
 import { saveExportContext } from '../utils/exportContext'
-import { formatWeightKg, getWeightKg, statusBadgeClass } from '../utils/helpers'
+import { canEditMeasurement, formatWeightKg, getWeightKg, statusBadgeClass } from '../utils/helpers'
 
 type ColumnKey =
   | 'project'
@@ -149,6 +149,7 @@ export function WeightDataPage() {
   const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
   const [viewing, setViewing] = useState<WeightRecord | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const appliedDefaultView = useRef(false)
 
   const buildPhaseOptions = useMemo(() => {
     const values = new Set<string>()
@@ -218,9 +219,10 @@ export function WeightDataPage() {
   useEffect(() => {
     saveExportContext(
       filtered.map((r) => r.id),
+      visibleColumns.filter((column) => column !== 'actions'),
       selectedIds.filter((id) => filtered.some((r) => r.id === id)),
     )
-  }, [filtered, selectedIds])
+  }, [filtered, selectedIds, visibleColumns])
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => records.some((r) => r.id === id)))
@@ -336,9 +338,19 @@ export function WeightDataPage() {
   }
 
   function openEdit(record: WeightRecord) {
+    if (!canEditMeasurement(record.status)) return
     setEditing(record)
     setShowForm(true)
   }
+
+  useEffect(() => {
+    if (appliedDefaultView.current) return
+    appliedDefaultView.current = true
+    const defaultView = savedViews.find((view) => view.isDefault)
+    if (defaultView) applyView(defaultView.id)
+    // Apply the stored default once on entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -371,7 +383,7 @@ export function WeightDataPage() {
           <label>
             Saved Views
             <select value={selectedViewId} onChange={(e) => applyView(e.target.value)}>
-              <option value="all">All Records (Default)</option>
+              <option value="all">All Records</option>
               {savedViews.map((view) => (
                 <option key={view.id} value={view.id}>
                   {view.name}
@@ -637,11 +649,12 @@ export function WeightDataPage() {
                             >
                               <RotateCcw size={15} />
                             </button>
-                          ) : (
+                          ) : null}
+                          {r.status === 'Draft' ? (
                             <button type="button" className="button ghost" title="Edit" onClick={() => openEdit(r)}>
                               <Pencil size={15} />
                             </button>
-                          )}
+                          ) : null}
                           <button
                             type="button"
                             className="button ghost"
