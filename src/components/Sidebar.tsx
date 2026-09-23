@@ -11,7 +11,7 @@ const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/projects', label: 'Projects', icon: FolderKanban },
   { to: '/weight-data', label: 'Weight Data', icon: Scale },
-  { to: '/import-export', label: 'Export', icon: Download },
+  { to: '/export', label: 'Export', icon: Download },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

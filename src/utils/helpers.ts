@@ -2,12 +2,11 @@ import type {
   AppData,
   DataSource,
   ExpectedItems,
-  Level,
   RecordStatus,
   WeightRecord,
   WeightUnit,
 } from '../data/types'
-import { COLLECTED_STATUSES, DATA_SOURCES, LEVELS, RECORD_STATUSES } from '../data/types'
+import { DATA_SOURCES, RECORD_STATUSES } from '../data/types'
 
 export function nowIso(): string {
   return new Date().toISOString()
@@ -120,6 +119,7 @@ export function formatDate(iso?: string | null): string {
   return d
 }
 
+/** Default empty legacy expectedItems for new projects / seed compatibility. */
 export function emptyExpected(): ExpectedItems {
   return { Part: 0, Node: 0, Rack: 0, Package: 0 }
 }
@@ -128,58 +128,6 @@ export function countByLevel(records: WeightRecord[]): ExpectedItems {
   const out = emptyExpected()
   for (const r of records) out[r.level] += 1
   return out
-}
-
-export function collectedByLevel(records: WeightRecord[]): ExpectedItems {
-  const out = emptyExpected()
-  for (const r of records) {
-    if (COLLECTED_STATUSES.includes(r.status) && getWeightKg(r) != null) out[r.level] += 1
-  }
-  return out
-}
-
-export function completenessRatio(collected: number, expected: number): number {
-  if (expected <= 0) return collected > 0 ? 1 : 0
-  return Math.min(1, collected / expected)
-}
-
-export function projectCompleteness(
-  expected: ExpectedItems,
-  records: WeightRecord[],
-): { collected: ExpectedItems; overall: number; byLevel: Record<Level, number> } {
-  const collected = collectedByLevel(records)
-  let collectedTotal = 0
-  let expectedTotal = 0
-  const byLevel = {} as Record<Level, number>
-  for (const level of LEVELS) {
-    collectedTotal += collected[level]
-    expectedTotal += expected[level]
-    byLevel[level] = completenessRatio(collected[level], expected[level])
-  }
-  return {
-    collected,
-    overall: completenessRatio(collectedTotal, expectedTotal),
-    byLevel,
-  }
-}
-
-export function overallDataCompleteness(data: AppData): number {
-  let collectedTotal = 0
-  let expectedTotal = 0
-  for (const project of data.projects) {
-    if (project.status !== 'Active') continue
-    const recs = data.records.filter((r) => r.projectId === project.id)
-    const c = collectedByLevel(recs)
-    for (const level of LEVELS) {
-      collectedTotal += c[level]
-      expectedTotal += project.expectedItems[level]
-    }
-  }
-  return completenessRatio(collectedTotal, expectedTotal)
-}
-
-export function percentLabel(ratio: number): string {
-  return `${Math.round(ratio * 100)}%`
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

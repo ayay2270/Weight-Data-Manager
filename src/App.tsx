@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { DataProvider } from './hooks/useData'
 import { DashboardPage } from './pages/DashboardPage'
-import { ImportExportPage } from './pages/ImportExportPage'
+import { ExportPage } from './pages/ExportPage'
 import { ProjectDetailPage } from './pages/ProjectDetailPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -20,7 +20,8 @@ export default function App() {
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
               <Route path="/weight-data" element={<WeightDataPage />} />
-              <Route path="/import-export" element={<ImportExportPage />} />
+              <Route path="/export" element={<ExportPage />} />
+              <Route path="/import-export" element={<Navigate to="/export" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -1,4 +1,4 @@
-import { exportCsv, importCsvText } from '../src/utils/io'
+import { exportCsv } from '../src/utils/io'
 import { migrateRecordStatus, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
 import { normalizeAppData } from '../src/utils/storage'
 import type { AppData, WeightRecord } from '../src/data/types'
@@ -174,20 +174,27 @@ const scenario3 = normalizeWeightRecord({
 assertEqual(scenario3.configuration, 'Full rack + pallet', 'scenario3 configuration saved')
 assertEqual(scenario3.description, 'S219B L11 xIO', 'scenario3 description separate')
 
-// Import / export new columns
-const csv = [
-  'Level,Project,Build / Phase,Description,Weight,Unit,Configuration / Included Items,Supplier / Data Provider,Reference / Document Rev.,Measured By,Source,Status,Reviewed By,Reviewed Date',
-  'Part,S219B,DV,Import MB,1180,g,Bare motherboard,,,Amy,Internal Measurement,Pending Review,,',
-  'Package,E2010,,Import Sleeve,4.83,kg,Sleeve only,Bromake,PKG Weight List Rev.B,,Supplier,Pending Review,,',
-].join('\n')
-const imported = importCsvText(csv, base).data.records
-assertEqual(imported.length, 2, 'workflow CSV imports rows')
-assertEqual(imported[0].buildPhase, 'DV', 'import buildPhase')
-assertEqual(imported[0].configuration, 'Bare motherboard', 'import configuration')
-assertEqual(imported[0].measuredBy, 'Amy', 'import measuredBy')
-assertEqual(imported[0].status, 'Pending Review', 'import status')
-assertEqual(imported[1].supplier, 'Bromake', 'import supplier')
-assertEqual(imported[1].reference, 'PKG Weight List Rev.B', 'import reference')
+// Review workflow: Need Recheck → resubmit keeps review comment context, status Pending Review
+const recheck = normalizeWeightRecord({
+  ...scenario1,
+  status: 'Need Recheck',
+  reviewedBy: 'Jason',
+  reviewedDate: '2026-09-23',
+  reviewComment: 'Please re-weigh without heatsink',
+})
+const resubmitted = normalizeWeightRecord({
+  ...recheck,
+  weightValue: 1200,
+  weightUnit: 'g',
+  status: 'Pending Review',
+  reviewedBy: recheck.reviewedBy,
+  reviewedDate: recheck.reviewedDate,
+  reviewComment: recheck.reviewComment,
+})
+assertEqual(resubmitted.status, 'Pending Review', 'resubmit → Pending Review')
+assertEqual(resubmitted.reviewedBy, 'Jason', 'resubmit preserves reviewedBy (tester cannot edit)')
+assertEqual(resubmitted.reviewComment, 'Please re-weigh without heatsink', 'resubmit preserves review comment')
+assertEqual(resubmitted.weight_kg, 1.2, 'resubmit updates measurement weight')
 
 const exported = exportCsv({
   ...base,
@@ -203,13 +210,7 @@ assertTruthy(exported.includes('Reviewed Date'), 'export has Reviewed Date')
 assertTruthy(exported.includes('Full rack + pallet'), 'export includes configuration value')
 assertTruthy(exported.includes('Bromake'), 'export includes supplier value')
 
-// Old CSV without new columns still imports
-const legacyCsv = importCsvText(
-  ['Level,Project,Description,Weight,Unit', 'Part,P1,Old row,1180,g'].join('\n'),
-  base,
-).data.records
-assertEqual(legacyCsv.length, 1, 'legacy CSV without new columns imports')
-assertEqual(legacyCsv[0].weight_kg, 1.18, 'legacy CSV weight intact')
-assertEqual(legacyCsv[0].status, 'Pending Review', 'legacy CSV defaults Pending Review')
+// Legacy expectedItems still loads without breaking normalize
+assertTruthy(legacy.projects[0].expectedItems, 'legacy expectedItems retained for compatibility')
 
 console.log('Workflow verification complete.')

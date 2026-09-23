@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
-import { DATA_SOURCES, LEVELS, RECORD_STATUSES } from '../data/types'
-import { nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
+import { DATA_SOURCES, LEVELS } from '../data/types'
+import { nowIso, toWeightKg, uid } from '../utils/helpers'
 import { Modal } from './Modal'
 
 interface RecordFormModalProps {
@@ -13,6 +13,8 @@ interface RecordFormModalProps {
   onClose: () => void
   onSave: (record: WeightRecord) => void
 }
+
+type SaveIntent = 'draft' | 'submit' | 'resubmit' | 'keep' | 'addNext'
 
 const emptyForm = {
   projectId: '',
@@ -31,10 +33,6 @@ const emptyForm = {
   reference: '',
   measuredBy: '',
   measuredDate: '',
-  status: 'Draft' as RecordStatus,
-  reviewedBy: '',
-  reviewedDate: '',
-  reviewComment: '',
   note: '',
 }
 
@@ -72,10 +70,6 @@ export function RecordFormModal({
         reference: initial.reference || '',
         measuredBy: initial.measuredBy || '',
         measuredDate: initial.measuredDate || '',
-        status: initial.status,
-        reviewedBy: initial.reviewedBy || '',
-        reviewedDate: initial.reviewedDate || '',
-        reviewComment: initial.reviewComment || '',
         note: initial.note || '',
       })
     } else {
@@ -98,6 +92,8 @@ export function RecordFormModal({
   const showPackageHint = form.level === 'Package'
   const showSupplierEmphasis = form.source === 'Supplier'
   const convertedKg = form.weightValue.trim() === '' ? null : toWeightKg(Number(form.weightValue), form.weightUnit)
+  const currentStatus: RecordStatus | null = initial?.status ?? null
+  const showRecheckContext = currentStatus === 'Need Recheck' && Boolean(initial?.reviewComment)
 
   const activeProjects = useMemo(
     () => projects.filter((p) => p.status === 'Active' || p.id === form.projectId),
@@ -127,16 +123,48 @@ export function RecordFormModal({
     })
   }
 
-  function setStatus(status: RecordStatus) {
-    setForm((prev) => ({
-      ...prev,
-      status,
-      reviewedDate:
-        status === 'Verified' && !prev.reviewedDate.trim() ? todayDate() : prev.reviewedDate,
-    }))
+  function resolveStatus(intent: SaveIntent): {
+    status: RecordStatus
+    reviewedBy: string | null
+    reviewedDate: string | null
+    reviewComment: string | null
+  } {
+    if (!initial) {
+      return {
+        status: intent === 'submit' ? 'Pending Review' : 'Draft',
+        reviewedBy: null,
+        reviewedDate: null,
+        reviewComment: null,
+      }
+    }
+
+    if (intent === 'draft') {
+      return {
+        status: 'Draft',
+        reviewedBy: null,
+        reviewedDate: null,
+        reviewComment: null,
+      }
+    }
+
+    if (intent === 'submit' || intent === 'resubmit') {
+      return {
+        status: 'Pending Review',
+        reviewedBy: initial.reviewedBy ?? null,
+        reviewedDate: initial.reviewedDate ?? null,
+        reviewComment: initial.reviewComment ?? null,
+      }
+    }
+
+    return {
+      status: initial.status,
+      reviewedBy: initial.reviewedBy ?? null,
+      reviewedDate: initial.reviewedDate ?? null,
+      reviewComment: initial.reviewComment ?? null,
+    }
   }
 
-  function handleSave(addNext = false) {
+  function handleSave(intent: SaveIntent) {
     const project = projects.find((p) => p.id === form.projectId)
     if (!project) {
       setError('Please select a project.')
@@ -151,15 +179,10 @@ export function RecordFormModal({
       setError('Weight must be a valid number.')
       return
     }
-    if (
-      (form.status === 'Pending Review' || form.status === 'Verified') &&
-      (weightValue == null || weightValue <= 0)
-    ) {
-      setError('Pending Review / Verified records need a weight greater than zero.')
-      return
-    }
-    if (form.status === 'Verified' && !form.reviewedBy.trim()) {
-      setError('Reviewed By is required when Status is Verified.')
+
+    const resolved = resolveStatus(intent)
+    if (resolved.status === 'Pending Review' && (weightValue == null || weightValue <= 0)) {
+      setError('Pending Review records need a weight greater than zero.')
       return
     }
 
@@ -184,16 +207,16 @@ export function RecordFormModal({
       measuredBy: form.measuredBy.trim() || null,
       measuredDate: form.measuredDate || null,
       source: form.source,
-      status: form.status,
-      reviewedBy: form.reviewedBy.trim() || null,
-      reviewedDate: form.reviewedDate || null,
-      reviewComment: form.reviewComment.trim() || null,
+      status: resolved.status,
+      reviewedBy: resolved.reviewedBy,
+      reviewedDate: resolved.reviewedDate,
+      reviewComment: resolved.reviewComment,
       note: form.note.trim() || null,
       originalWeightText: initial?.originalWeightText || null,
       createdAt: initial?.createdAt || stamp,
       updatedAt: stamp,
     })
-    if (!addNext || initial) {
+    if (intent !== 'addNext' || initial) {
       onClose()
       return
     }
@@ -208,28 +231,96 @@ export function RecordFormModal({
       weightUnit: prev.level === 'Part' ? 'g' : prev.weightUnit,
     }))
     setError(null)
-    setSuccess('Record saved.')
+    setSuccess('Draft saved. Ready for the next record.')
     window.setTimeout(() => descriptionRef.current?.focus(), 0)
   }
 
-  return (
-    <Modal
-      title={initial ? 'Edit Weight Record' : 'Add Weight Record'}
-      onClose={onClose}
-      footer={
+  function footerActions() {
+    if (!initial) {
+      return (
         <>
           <button type="button" className="button secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="button" onClick={() => handleSave()}>
+          <button type="button" className="button secondary" onClick={() => handleSave('draft')}>
+            Save Draft
+          </button>
+          <button type="button" className="button ghost" onClick={() => handleSave('addNext')}>
+            Save & Add Next
+          </button>
+          <button type="button" className="button" onClick={() => handleSave('submit')}>
+            Submit for Review
+          </button>
+        </>
+      )
+    }
+
+    if (currentStatus === 'Draft') {
+      return (
+        <>
+          <button type="button" className="button secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="button secondary" onClick={() => handleSave('draft')}>
+            Save Draft
+          </button>
+          <button type="button" className="button" onClick={() => handleSave('submit')}>
+            Submit for Review
+          </button>
+        </>
+      )
+    }
+
+    if (currentStatus === 'Need Recheck') {
+      return (
+        <>
+          <button type="button" className="button secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="button secondary" onClick={() => handleSave('keep')}>
             Save
           </button>
-          {!initial ? <button type="button" className="button" onClick={() => handleSave(true)}>Save & Add Next</button> : null}
+          <button type="button" className="button" onClick={() => handleSave('resubmit')}>
+            Resubmit for Review
+          </button>
         </>
-      }
-    >
+      )
+    }
+
+    return (
+      <>
+        <button type="button" className="button secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="button" onClick={() => handleSave('keep')}>
+          Save
+        </button>
+      </>
+    )
+  }
+
+  return (
+    <Modal title={initial ? 'Edit Weight Record' : 'Add Weight Record'} onClose={onClose} footer={footerActions()}>
       {error ? <div className="alert error">{error}</div> : null}
       {success ? <div className="alert success">{success}</div> : null}
+
+      {currentStatus ? (
+        <div className="form-status-banner">
+          <span className="muted">Current status</span>
+          <span className={`badge ${currentStatus.replace(/\s+/g, '-')}`}>{currentStatus}</span>
+        </div>
+      ) : null}
+
+      {showRecheckContext ? (
+        <div className="alert warn review-context">
+          <strong>Need Recheck reason</strong>
+          <p>{initial?.reviewComment}</p>
+          <small className="muted">
+            Review fields are managed in Review workflow. Update measurement data, then Resubmit for Review.
+          </small>
+        </div>
+      ) : null}
+
       <div className="form-grid">
         <label>
           Project
@@ -381,42 +472,6 @@ export function RecordFormModal({
             type="date"
             value={form.measuredDate}
             onChange={(e) => setForm({ ...form, measuredDate: e.target.value })}
-          />
-        </label>
-
-        <label>
-          Status
-          <select value={form.status} onChange={(e) => setStatus(e.target.value as RecordStatus)}>
-            {RECORD_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Reviewed By
-          <input
-            value={form.reviewedBy}
-            onChange={(e) => setForm({ ...form, reviewedBy: e.target.value })}
-            placeholder="Engineer name"
-          />
-        </label>
-        <label>
-          Reviewed Date
-          <input
-            type="date"
-            value={form.reviewedDate}
-            onChange={(e) => setForm({ ...form, reviewedDate: e.target.value })}
-          />
-        </label>
-        <label className="span-2">
-          Review Comment
-          <textarea
-            rows={2}
-            maxLength={500}
-            value={form.reviewComment}
-            onChange={(e) => setForm({ ...form, reviewComment: e.target.value })}
           />
         </label>
 

@@ -1,4 +1,3 @@
-import { importCsvText } from '../src/utils/io'
 import { formatWeightKg, getWeightKg, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
 import { normalizeAppData } from '../src/utils/storage'
 import type { AppData } from '../src/data/types'
@@ -34,13 +33,34 @@ assertEqual(edited.weight_kg, 8.66, 'edit saves kg canonical value')
 const duplicate = normalizeWeightRecord({ ...legacy.records[0], id: 'copy' })
 assertEqual(getWeightKg(duplicate), 1.18, 'duplicate does not double-convert')
 
-const imported = importCsvText(
-  ['Level,Project,Description,Weight,Unit', 'Part,P1,Separate unit,1180,g', 'Rack,P1,Explicit text,1.18 kg,', 'Part,P1,Gram text,158.9 g,'].join('\n'),
-  base,
-).data.records
-assertEqual(imported.length, 3, 'CSV imports all rows')
-assertEqual(imported[0].weight_kg, 1.18, 'CSV numeric plus unit normalizes')
-assertEqual(imported[1].weight_kg, 1.18, 'CSV kg string normalizes')
-assertEqual(imported[2].weight_kg, 0.1589, 'CSV g string normalizes')
+const fromGrams = normalizeWeightRecord({
+  id: 'g1',
+  projectId: 'p',
+  projectCode: 'P',
+  level: 'Part',
+  description: 'Gram text',
+  weightValue: 158.9,
+  weightUnit: 'g',
+  source: 'Internal Measurement',
+  status: 'Draft',
+  createdAt: '',
+  updatedAt: '',
+})
+assertEqual(fromGrams.weight_kg, 0.1589, 'gram input normalizes to kg')
+
+const fromKg = normalizeWeightRecord({
+  id: 'k1',
+  projectId: 'p',
+  projectCode: 'P',
+  level: 'Rack',
+  description: 'Kg value',
+  weightValue: 1.18,
+  weightUnit: 'kg',
+  source: 'Internal Measurement',
+  status: 'Draft',
+  createdAt: '',
+  updatedAt: '',
+})
+assertEqual(fromKg.weight_kg, 1.18, 'kg input stays kg')
 
 console.log('Weight unit verification complete.')

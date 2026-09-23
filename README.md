@@ -1,53 +1,63 @@
 # Weight Data Manager
 
-Browser-based engineering weight database for Part / Node / Rack / Package measurements. Teams track collection progress per project, import Excel/CSV workbooks, and keep data locally in the browser (JSON + LocalStorage). No backend server is required for V1.
+Browser-based weight data collection and review tool for Part / Node / Rack / Package measurements. Teams enter measurements, submit them for engineer review, and keep data locally in the browser (JSON + LocalStorage). No backend server is required for V1.
+
+**Live app:** https://ayay2270.github.io/Weight-Data-Manager/
 
 ## Purpose
 
-Replace scattered Excel weight logs with a shared-style web app that:
+Replace scattered Excel weight logs with a focused web app that:
 
 - Accepts g or kg inputs and stores every record as canonical `weight_kg`
-- Shows project collection progress and completeness (Collected ÷ Expected)
-- Supports add / edit / delete / duplicate workflows
-- Imports the existing Weight Measurement Record X01 workbook
-- Exports Excel, CSV, and JSON backups
+- Supports Tester draft entry and Submit for Review
+- Supports Engineer review (Verified / Need Recheck / Rejected)
+- Provides project management, search / filter / sorting, and saved views
+- Exports Excel and CSV, plus JSON backup from Settings
 
 ## Users
 
-- Mechanical / packaging / system engineers collecting weights
-- Project leads reviewing completeness by Part / Node / Rack / Package
-- Anyone who previously maintained `Weight Measurement Record_X01.xlsx`
+- Testers collecting and updating measurement data
+- Engineers reviewing Pending Review and Need Recheck queues
+- Project leads tracking record status by project
 
 ## Typical workflow
 
 1. Open the Web App (or run locally).
-2. Review **Dashboard** progress bars and recent records.
-3. Open **Projects** to set expected item counts (completeness targets).
-4. Enter or edit rows in **Weight Data**.
-5. Use **Import / Export** for Excel/CSV hand-off.
-6. Use **Settings** for defaults, JSON backup, or reset demo data.
+2. Review **Dashboard** attention items and recent records.
+3. Manage projects in **Projects**.
+4. Enter measurements in **Weight Data** as Draft, then **Submit for Review**.
+5. Engineers open **Review** on Pending Review rows → Verify / Need Recheck / Reject.
+6. Need Recheck rows return to the Tester for edits, then **Resubmit for Review**.
+7. Use **Export** for Excel/CSV hand-off; use **Settings** for JSON backup or demo reset.
+
+## Core features
+
+- Project management (Active / Archived)
+- Weight Data management (Add / Edit / Duplicate / Delete)
+- Tester measurement entry (Save Draft, Save & Add Next, Submit for Review)
+- Engineer Review Modal (Verify, Need Recheck, Reject)
+- Search, filters, sorting, column visibility, and saved views
+- Export to Excel / CSV
+- Settings: defaults, JSON backup / restore, reset demo data
 
 ## Stack
 
 - React 19 + TypeScript + Vite
 - React Router
 - Recharts
-- SheetJS (`xlsx`) for Excel/CSV
+- SheetJS (`xlsx`) for Excel/CSV export
 - LocalStorage persistence (no auth, no server)
-
-Future Supabase / SharePoint hooks can attach to the same Project / WeightRecord model without changing V1 UI contracts.
 
 ## Repository structure
 
 ```text
 src/
-  components/   Sidebar, modal, progress, record form
-  pages/        Dashboard, Projects, Weight Data, Import/Export, Settings
-  data/         types + seed.json (normalized from X01)
+  components/   Sidebar, modals, record form, review modal
+  pages/        Dashboard, Projects, Weight Data, Export, Settings
+  data/         types + seed.json
   hooks/        LocalStorage data provider
-  utils/        completeness helpers, Excel/CSV IO, storage
-public/sample/  Sample X01 workbook for import testing
-data/           Original Excel source file
+  utils/        helpers, Excel/CSV export, storage
+public/         Static assets
 ```
 
 ## Local development
@@ -65,6 +75,10 @@ npm run preview
 ```
 
 Preview server: [http://127.0.0.1:43123/Weight-Data-Manager/](http://127.0.0.1:43123/Weight-Data-Manager/)
+
+```bash
+npm test
+```
 
 ## Deployment (GitHub Pages)
 
@@ -86,12 +100,12 @@ npx --yes gh-pages -d dist -b gh-pages
 ## Data notes
 
 - Record tables display canonical kilograms to three decimal places; the original numeric input and unit remain available when editing.
-- Completeness = records with status Pending Review or Verified (and a weight) ÷ project `expectedItems`
-- Expected counts are editable per project in the Projects UI — not hardcoded in dashboard widgets
 - Source values: Internal Measurement, Supplier, Specification, Estimated, Unknown
 - Status values: Draft, Pending Review, Verified, Rejected, Need Recheck
-- Record fields also include Build / Phase, Configuration, Measured By, Reviewed By / Date, Supplier, Reference
+- Review-only fields (`reviewedBy`, `reviewedDate`, `reviewComment`) are updated only through the Review Modal
+- Record fields also include Build / Phase, Configuration, Measured By, Supplier, Reference
 - Older LocalStorage statuses (Measured / Estimated / Missing) are migrated on read
+- Projects may still contain a legacy `expectedItems` field in stored JSON; it is ignored by the UI
 - UI language: Traditional Chinese / English only (no Simplified Chinese chrome or README)
 
 ## License / scope

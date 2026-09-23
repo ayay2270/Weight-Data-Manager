@@ -893,6 +893,29 @@ tr.clickable:hover {
   border-bottom: 0;
   border-top: 1px solid var(--line);
   justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.form-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.alert.warn {
+  background: #fff8eb;
+  color: #8a5a00;
+  border-color: #f0d6a0;
+}
+
+.alert.warn.review-context p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.alert.warn.review-context small {
+  display: block;
 }
 
 .modal-body {

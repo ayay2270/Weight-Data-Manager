@@ -14,13 +14,17 @@ export type RecordStatus =
   | 'Rejected'
   | 'Need Recheck'
 
-/** Legacy statuses that may still exist in LocalStorage / imports. */
+/** Legacy statuses that may still exist in LocalStorage. */
 export type LegacyRecordStatus = 'Measured' | 'Estimated' | 'Missing'
 
 export type ProjectStatus = 'Active' | 'Archived'
 
 export type WeightUnit = 'g' | 'kg'
 
+/**
+ * Legacy per-level count shape retained for LocalStorage / seed compatibility.
+ * Not used by product UI (Expected / Completeness was removed).
+ */
 export interface ExpectedItems {
   Part: number
   Node: number
@@ -34,6 +38,7 @@ export interface Project {
   name: string
   phase?: string | null
   status: ProjectStatus
+  /** @deprecated Legacy field kept so older LocalStorage payloads still load. Not shown in UI. */
   expectedItems: ExpectedItems
   notes?: string | null
   createdAt: string
@@ -105,6 +110,3 @@ export const RECORD_STATUSES: RecordStatus[] = [
   'Rejected',
   'Need Recheck',
 ]
-
-/** Records counted toward collection completeness (have usable measured data). */
-export const COLLECTED_STATUSES: RecordStatus[] = ['Pending Review', 'Verified']
