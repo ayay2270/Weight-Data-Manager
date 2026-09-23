@@ -54,12 +54,14 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
               <Row label="Level" value={record.level} />
               <Row label="Description" value={record.description} />
               <Row label="Lenovo PN" value={record.lenovoPn} />
+              <Row label="MSFT PN" value={record.customerPn} />
+              <Row label="Part Category" value={record.category} />
               <Row label="Manufacturer" value={record.manufacturer} />
               <Row label="Weight" value={formatWeightKg(record)} />
               <Row label="Configuration" value={record.configuration} />
               <Row label="Source" value={record.source} />
-              <Row label="Supplier" value={record.supplier} />
-              <Row label="Reference" value={record.reference} />
+              <Row label="Supplier / Data Provider" value={record.supplier} />
+              <Row label="Reference / Document Rev." value={record.reference} />
               <Row label="Measured By" value={record.measuredBy} />
               <Row label="Measured Date" value={record.measuredDate} />
               <Row label="Notes" value={record.note} />
@@ -75,7 +77,7 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
                   <span className={`badge ${statusBadgeClass(record.status)}`}>{record.status}</span>
                 </dd>
               </div>
-              <Row label="Reviewer" value={record.reviewedBy} />
+              <Row label="Reviewed By" value={record.reviewedBy} />
               <Row label="Reviewed Date" value={record.reviewedDate} />
               <Row label="Review Comment" value={record.reviewComment} />
             </dl>

@@ -21,7 +21,7 @@ export function exportWorkbook(data: AppData, subset?: WeightRecord[]): ArrayBuf
     const rows = source
       .filter((r) => r.level === level)
       .map((r) => ({
-        'Part Description': r.description,
+        Description: r.description,
         'Lenovo PN': r.lenovoPn || '',
         'MSFT PN': r.customerPn || '',
         Manufacturer: r.manufacturer || '',

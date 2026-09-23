@@ -14,9 +14,10 @@ export type DuplicateCandidate = {
 }
 
 /**
- * Simple duplicate check for manual Add Record.
- * Strong match: same project + same Lenovo PN (when PN present).
- * Soft match: same project + level + description + build phase + configuration.
+ * Warning-only duplicate check.
+ * With a Lenovo PN: same project + PN + level is required, and build phase,
+ * description, or configuration must also agree.
+ * Without a PN: same project + level + description + configuration.
  */
 export function findPossibleDuplicate(
   candidate: DuplicateCandidate,
@@ -30,29 +31,39 @@ export function findPossibleDuplicate(
   const description = norm(candidate.description)
   const buildPhase = norm(candidate.buildPhase)
   const configuration = norm(candidate.configuration)
-  const level = candidate.level
 
-  let softMatch: WeightRecord | null = null
+  let best: WeightRecord | null = null
+  let bestScore = 0
 
   for (const record of records) {
     if (excludeId && record.id === excludeId) continue
-    if (record.projectId !== projectId) continue
+    if (record.projectId !== projectId || record.level !== candidate.level) continue
 
     const recordPn = norm(record.lenovoPn)
+    const samePhase = buildPhase === norm(record.buildPhase)
+    const sameDescription = Boolean(description) && description === norm(record.description)
+    const sameConfiguration = configuration === norm(record.configuration)
+
     if (pn && recordPn && pn === recordPn) {
-      return record
+      let score = 3
+      if (samePhase) score += 2
+      if (sameDescription) score += 1
+      if (sameConfiguration) score += 1
+      if (score >= 5 && score > bestScore) {
+        best = record
+        bestScore = score
+      }
+      continue
     }
 
-    if (
-      record.level === level &&
-      description &&
-      norm(record.description) === description &&
-      buildPhase === norm(record.buildPhase) &&
-      configuration === norm(record.configuration)
-    ) {
-      softMatch = softMatch || record
+    if (!pn && !recordPn && sameDescription && sameConfiguration && samePhase) {
+      const score = 4
+      if (score > bestScore) {
+        best = record
+        bestScore = score
+      }
     }
   }
 
-  return softMatch
+  return best
 }

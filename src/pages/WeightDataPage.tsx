@@ -383,7 +383,7 @@ export function WeightDataPage() {
           <label>
             Saved Views
             <select value={selectedViewId} onChange={(e) => applyView(e.target.value)}>
-              <option value="all">All Records</option>
+              <option value="all">All Records{savedViews.some((view) => view.isDefault) ? '' : ' (Default)'}</option>
               {savedViews.map((view) => (
                 <option key={view.id} value={view.id}>
                   {view.name}
@@ -663,16 +663,18 @@ export function WeightDataPage() {
                           >
                             <Copy size={15} />
                           </button>
-                          <button
-                            type="button"
-                            className="button ghost"
-                            title="Delete"
-                            onClick={() => {
-                              if (confirm('Delete this weight record?')) deleteRecord(r.id)
-                            }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {r.status === 'Draft' ? (
+                            <button
+                              type="button"
+                              className="button ghost"
+                              title="Delete"
+                              onClick={() => {
+                                if (confirm('Delete this weight record?')) deleteRecord(r.id)
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     ) : null}
@@ -763,7 +765,13 @@ export function WeightDataPage() {
           <div className="saved-views-manager">
             <div className="saved-view-row locked">
               <strong>All Records</strong>
-              <span className="muted">Default · always available</span>
+              <button
+                type="button"
+                className="button ghost"
+                onClick={() => persistViews(savedViews.map((item) => ({ ...item, isDefault: false })))}
+              >
+                {savedViews.some((view) => view.isDefault) ? 'Set Default' : 'Default'}
+              </button>
             </div>
             {savedViews.map((view) => (
               <div className="saved-view-row" key={view.id}>

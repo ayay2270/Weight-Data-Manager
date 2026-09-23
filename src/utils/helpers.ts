@@ -1,7 +1,7 @@
 import type {
   AppData,
   DataSource,
-  ExpectedItems,
+  Level,
   RecordStatus,
   WeightRecord,
   WeightUnit,
@@ -124,13 +124,8 @@ export function formatDate(iso?: string | null): string {
   return d
 }
 
-/** Default empty legacy expectedItems for new projects / seed compatibility. */
-export function emptyExpected(): ExpectedItems {
-  return { Part: 0, Node: 0, Rack: 0, Package: 0 }
-}
-
-export function countByLevel(records: WeightRecord[]): ExpectedItems {
-  const out = emptyExpected()
+export function countByLevel(records: WeightRecord[]): Record<Level, number> {
+  const out: Record<Level, number> = { Part: 0, Node: 0, Rack: 0, Package: 0 }
   for (const r of records) out[r.level] += 1
   return out
 }

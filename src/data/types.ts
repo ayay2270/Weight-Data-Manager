@@ -35,7 +35,8 @@ export interface ExpectedItems {
 export interface Project {
   id: string
   code: string
-  name: string
+  /** Optional legacy label from older saved projects. Not shown in the UI. */
+  name?: string | null
   phase?: string | null
   status: ProjectStatus
   /**

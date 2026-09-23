@@ -188,13 +188,13 @@ const resubmitted = normalizeWeightRecord({
   weightValue: 1200,
   weightUnit: 'g',
   status: 'Pending Review',
-  reviewedBy: recheck.reviewedBy,
-  reviewedDate: recheck.reviewedDate,
-  reviewComment: recheck.reviewComment,
+  reviewedBy: null,
+  reviewedDate: null,
+  reviewComment: null,
 })
 assertEqual(resubmitted.status, 'Pending Review', 'resubmit → Pending Review')
-assertEqual(resubmitted.reviewedBy, 'Jason', 'resubmit preserves reviewedBy (tester cannot edit)')
-assertEqual(resubmitted.reviewComment, 'Please re-weigh without heatsink', 'resubmit preserves review comment')
+assertEqual(resubmitted.reviewedBy, null, 'resubmit clears reviewedBy for a new review round')
+assertEqual(resubmitted.reviewComment, null, 'resubmit clears review comment')
 assertEqual(resubmitted.weight_kg, 1.2, 'resubmit updates measurement weight')
 
 const exported = exportCsv({
@@ -211,8 +211,9 @@ assertTruthy(exported.includes('Reviewed Date'), 'export has Reviewed Date')
 assertTruthy(exported.includes('Full rack + pallet'), 'export includes configuration value')
 assertTruthy(exported.includes('Bromake'), 'export includes supplier value')
 
-// Legacy expectedItems still loads without breaking normalize
-assertTruthy(legacy.projects[0].expectedItems, 'legacy expectedItems retained for compatibility')
+// Legacy expectedItems is ignored on load and does not block the project
+assertEqual(legacy.projects[0].code, 'S219B', 'legacy project with expectedItems still loads')
+assertEqual('expectedItems' in legacy.projects[0], false, 'expectedItems is ignored after load')
 const withoutExpected = normalizeAppData({
   ...base,
   projects: [
@@ -236,12 +237,28 @@ const dupBase: WeightRecord[] = [
     projectCode: 'S219B',
     level: 'Part',
     description: 'S219B MB',
+    buildPhase: 'DV',
     lenovoPn: '5C11A12345',
     configuration: 'Bare motherboard',
     weightValue: 1180,
     weightUnit: 'g',
     source: 'Internal Measurement',
     status: 'Verified',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'dup2',
+    projectId: 'prj_s219b',
+    projectCode: 'S219B',
+    level: 'Node',
+    description: 'Cable kit',
+    buildPhase: 'DV',
+    configuration: 'Cables only',
+    weightValue: 1,
+    weightUnit: 'kg',
+    source: 'Internal Measurement',
+    status: 'Draft',
     createdAt: '',
     updatedAt: '',
   },
@@ -260,23 +277,39 @@ assertEqual(
     dupBase,
   )?.id,
   'dup1',
-  'duplicate matches on Lenovo PN',
+  'duplicate matches project + PN + level + build phase',
 )
 
 assertEqual(
   findPossibleDuplicate(
     {
       projectId: 'prj_s219b',
-      level: 'Part',
+      level: 'Rack',
       description: 'S219B MB',
-      lenovoPn: null,
+      lenovoPn: '5C11A12345',
       configuration: 'Bare motherboard',
-      buildPhase: null,
+      buildPhase: 'DV',
+    },
+    dupBase,
+  ),
+  null,
+  'different level is not a strong duplicate',
+)
+
+assertEqual(
+  findPossibleDuplicate(
+    {
+      projectId: 'prj_s219b',
+      level: 'Node',
+      description: 'Cable kit',
+      lenovoPn: null,
+      configuration: 'Cables only',
+      buildPhase: 'DV',
     },
     dupBase,
   )?.id,
-  'dup1',
-  'duplicate soft-matches project+level+description+config',
+  'dup2',
+  'duplicate soft-matches project+level+description+config without PN',
 )
 
 assertEqual(

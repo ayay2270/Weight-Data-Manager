@@ -171,9 +171,9 @@ export function RecordFormModal({
     if (intent === 'submit' || intent === 'resubmit') {
       return {
         status: 'Pending Review',
-        reviewedBy: initial.reviewedBy ?? null,
-        reviewedDate: initial.reviewedDate ?? null,
-        reviewComment: initial.reviewComment ?? null,
+        reviewedBy: null,
+        reviewedDate: null,
+        reviewComment: null,
       }
     }
 
@@ -424,7 +424,7 @@ export function RecordFormModal({
               <option value="">Select project…</option>
               {activeProjects.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
+                  {p.phase ? `${p.code} · ${p.phase}` : p.code}
                 </option>
               ))}
             </select>
@@ -449,7 +449,7 @@ export function RecordFormModal({
           </label>
 
           <label className="span-2">
-            Part Description
+            Description
             <input
               ref={descriptionRef}
               value={form.description}

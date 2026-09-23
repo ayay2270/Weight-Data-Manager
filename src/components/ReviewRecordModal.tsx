@@ -10,24 +10,34 @@ interface ReviewRecordModalProps {
   onSave: (record: WeightRecord) => void
 }
 
+function show(value?: string | null): string {
+  const text = value?.trim()
+  return text ? text : '—'
+}
+
 const details = (record: WeightRecord) => [
-  ['Project', record.projectCode],
-  ['Build Phase', record.buildPhase || '—'],
+  ['Project', record.projectCode || '—'],
+  ['Build Phase', show(record.buildPhase)],
   ['Level', record.level],
-  ['Description', record.description || '—'],
-  ['Lenovo PN', record.lenovoPn || '—'],
-  ['Manufacturer', record.manufacturer || '—'],
+  ['Description', show(record.description)],
+  ['Lenovo PN', show(record.lenovoPn)],
+  ['MSFT PN', show(record.customerPn)],
+  ['Part Category', show(record.category)],
+  ['Manufacturer', show(record.manufacturer)],
   ['Weight', formatWeightKg(record)],
-  ['Configuration', record.configuration || '—'],
-  ['Measured By', record.measuredBy || '—'],
-  ['Measured Date', record.measuredDate || '—'],
+  ['Configuration', show(record.configuration)],
   ['Source', record.source],
+  ['Supplier / Data Provider', show(record.supplier)],
+  ['Reference / Document Rev.', show(record.reference)],
+  ['Measured By', show(record.measuredBy)],
+  ['Measured Date', show(record.measuredDate)],
+  ['Notes', show(record.note)],
   ['Current Status', record.status],
 ]
 
 export function ReviewRecordModal({ record, onClose, onSave }: ReviewRecordModalProps) {
-  const [reviewer, setReviewer] = useState(record?.reviewedBy || '')
-  const [comment, setComment] = useState(record?.reviewComment || '')
+  const [reviewer, setReviewer] = useState('')
+  const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   if (!record) return null

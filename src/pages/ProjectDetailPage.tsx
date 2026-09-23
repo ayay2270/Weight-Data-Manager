@@ -3,8 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import { CalendarDays, CheckCircle2, Clock3, Database, Pencil } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { PageHeader } from '../components/PageHeader'
+import { RecordDetailDrawer } from '../components/RecordDetailDrawer'
+import { RecordFormModal } from '../components/RecordFormModal'
+import { ReviewRecordModal } from '../components/ReviewRecordModal'
 import { useData } from '../hooks/useData'
-import type { Project, RecordStatus } from '../data/types'
+import type { Project, RecordStatus, WeightRecord } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
 import {
   countByLevel,
@@ -24,16 +27,19 @@ const STATUS_BAR_CLASS: Record<RecordStatus, string> = {
 
 export function ProjectDetailPage() {
   const { projectId } = useParams()
-  const { projects, records, upsertProject } = useData()
+  const { projects, records, settings, upsertProject, upsertRecord } = useData()
   const project = projects.find((p) => p.id === projectId)
   const [showEdit, setShowEdit] = useState(false)
   const [form, setForm] = useState({
     code: '',
-    name: '',
     phase: '',
     status: 'Active' as Project['status'],
     notes: '',
   })
+  const [editingRecord, setEditingRecord] = useState<WeightRecord | null>(null)
+  const [showRecordForm, setShowRecordForm] = useState(false)
+  const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
+  const [viewing, setViewing] = useState<WeightRecord | null>(null)
 
   const projectRecords = useMemo(
     () => records.filter((r) => r.projectId === projectId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
@@ -66,7 +72,6 @@ export function ProjectDetailPage() {
     if (!project) return
     setForm({
       code: project.code,
-      name: project.name,
       phase: project.phase || '',
       status: project.status,
       notes: project.notes || '',
@@ -75,11 +80,10 @@ export function ProjectDetailPage() {
   }
 
   function saveProject() {
-    if (!project || !form.code.trim() || !form.name.trim()) return
+    if (!project || !form.code.trim()) return
     upsertProject({
       ...project,
       code: form.code.trim(),
-      name: form.name.trim(),
       phase: form.phase.trim() || null,
       status: form.status,
       notes: form.notes.trim() || null,
@@ -104,7 +108,7 @@ export function ProjectDetailPage() {
   return (
     <>
       <PageHeader
-        title={`${project.code} · ${project.name}`}
+        title={project.code}
         subtitle={`${project.phase || 'No phase'} · ${project.status}`}
         actions={
           <>
@@ -165,8 +169,6 @@ export function ProjectDetailPage() {
             <dl className="details">
               <dt>Project</dt>
               <dd>{project.code}</dd>
-              <dt>Description</dt>
-              <dd>{project.name || '—'}</dd>
               <dt>Phase</dt>
               <dd>{project.phase || '—'}</dd>
               <dt>Status</dt>
@@ -263,6 +265,7 @@ export function ProjectDetailPage() {
                     <th>Level</th>
                     <th>Weight (kg)</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -278,11 +281,35 @@ export function ProjectDetailPage() {
                       <td>
                         <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
                       </td>
+                      <td>
+                        <div className="dashboard-row-actions">
+                          {r.status === 'Pending Review' ? (
+                            <button type="button" className="button" onClick={() => setReviewing(r)}>
+                              Review
+                            </button>
+                          ) : null}
+                          {r.status === 'Need Recheck' ? (
+                            <button
+                              type="button"
+                              className="button action-recheck"
+                              onClick={() => {
+                                setEditingRecord(r)
+                                setShowRecordForm(true)
+                              }}
+                            >
+                              Update Measurement
+                            </button>
+                          ) : null}
+                          <button type="button" className="button ghost" onClick={() => setViewing(r)}>
+                            View
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {!reviewQueue.length ? (
                     <tr>
-                      <td colSpan={4} className="empty">
+                      <td colSpan={5} className="empty">
                         No records waiting for review.
                       </td>
                     </tr>
@@ -341,10 +368,6 @@ export function ProjectDetailPage() {
                 <option value="Archived">Archived</option>
               </select>
             </label>
-            <label className="span-2">
-              Description
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </label>
             <label>
               Phase
               <input value={form.phase} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
@@ -356,6 +379,39 @@ export function ProjectDetailPage() {
           </div>
         </Modal>
       ) : null}
+      <RecordFormModal
+        open={showRecordForm}
+        projects={projects}
+        records={records}
+        initial={editingRecord}
+        defaultUnit={settings.defaultUnit}
+        onClose={() => {
+          setShowRecordForm(false)
+          setEditingRecord(null)
+        }}
+        onSave={upsertRecord}
+        onOpenExisting={(record) => {
+          setShowRecordForm(false)
+          setEditingRecord(null)
+          setViewing(record)
+        }}
+      />
+      <ReviewRecordModal
+        key={reviewing?.id || 'none'}
+        record={reviewing}
+        onClose={() => setReviewing(null)}
+        onSave={upsertRecord}
+      />
+      <RecordDetailDrawer
+        record={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={(record) => {
+          if (record.status !== 'Draft' && record.status !== 'Need Recheck') return
+          setEditingRecord(record)
+          setShowRecordForm(true)
+        }}
+        onReview={(record) => setReviewing(record)}
+      />
     </>
   )
 }

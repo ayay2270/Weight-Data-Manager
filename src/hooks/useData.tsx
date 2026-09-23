@@ -75,10 +75,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createdAt: project.createdAt || previous?.createdAt || stamp,
         updatedAt: stamp,
       }
-      if (saved.expectedItems == null && previous?.expectedItems) {
-        saved.expectedItems = previous.expectedItems
-      }
-      if (saved.expectedItems == null) delete saved.expectedItems
+      delete saved.expectedItems
       const projects = previous
         ? prev.projects.map((p) => (p.id === project.id ? saved : p))
         : [...prev.projects, saved]
@@ -129,11 +126,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteRecord = useCallback((id: string) => {
-    setData((prev) => ({
-      ...prev,
-      records: prev.records.filter((r) => r.id !== id),
-      settings: { ...prev.settings, lastUpdated: nowIso() },
-    }))
+    setData((prev) => {
+      const existing = prev.records.find((record) => record.id === id)
+      if (!existing || existing.status !== 'Draft') return prev
+      return {
+        ...prev,
+        records: prev.records.filter((r) => r.id !== id),
+        settings: { ...prev.settings, lastUpdated: nowIso() },
+      }
+    })
   }, [])
 
   const duplicateRecord = useCallback((id: string) => {

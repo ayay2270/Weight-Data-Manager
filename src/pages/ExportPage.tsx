@@ -152,7 +152,7 @@ export function ExportPage() {
                     {!projects.length ? <option value="">No projects</option> : null}
                     {projects.map((p) => (
                       <option key={p.id} value={p.code}>
-                        {p.code} — {p.name}
+                        {p.phase ? `${p.code} · ${p.phase}` : p.code}
                       </option>
                     ))}
                   </select>

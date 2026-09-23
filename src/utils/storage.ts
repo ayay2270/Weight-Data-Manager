@@ -13,7 +13,7 @@ export function normalizeAppData(data: AppData): AppData {
     ...data,
     projects: (data.projects || []).map((project) => {
       const next = { ...project }
-      if (next.expectedItems == null) delete next.expectedItems
+      delete next.expectedItems
       return next
     }),
     records: data.records.map((record) => normalizeWeightRecord(record)),

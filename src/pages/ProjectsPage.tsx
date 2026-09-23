@@ -22,7 +22,6 @@ export function ProjectsPage() {
   const [editing, setEditing] = useState<Project | null>(null)
   const [form, setForm] = useState({
     code: '',
-    name: '',
     phase: '',
     status: 'Active' as Project['status'],
     notes: '',
@@ -41,7 +40,7 @@ export function ProjectsPage() {
         if (!q) return true
         return (
           p.code.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
+          (p.name || '').toLowerCase().includes(q) ||
           (p.notes || '').toLowerCase().includes(q)
         )
       })
@@ -52,7 +51,6 @@ export function ProjectsPage() {
     setEditing(null)
     setForm({
       code: '',
-      name: '',
       phase: '',
       status: 'Active',
       notes: '',
@@ -64,7 +62,6 @@ export function ProjectsPage() {
     setEditing(project)
     setForm({
       code: project.code,
-      name: project.name,
       phase: project.phase || '',
       status: project.status,
       notes: project.notes || '',
@@ -73,19 +70,18 @@ export function ProjectsPage() {
   }
 
   function saveProject() {
-    if (!form.code.trim() || !form.name.trim()) return
+    if (!form.code.trim()) return
     const stamp = nowIso()
     const next: Project = {
       id: editing?.id || uid('prj'),
       code: form.code.trim(),
-      name: form.name.trim(),
       phase: form.phase.trim() || null,
       status: form.status,
       notes: form.notes.trim() || null,
       createdAt: editing?.createdAt || stamp,
       updatedAt: stamp,
     }
-    if (editing?.expectedItems) next.expectedItems = { ...editing.expectedItems }
+    if (editing?.name) next.name = editing.name
     upsertProject(next)
     setShowForm(false)
   }
@@ -215,10 +211,6 @@ export function ProjectsPage() {
                 <option value="Active">Active</option>
                 <option value="Archived">Archived</option>
               </select>
-            </label>
-            <label className="span-2">
-              Description
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label>
               Phase

@@ -105,7 +105,7 @@ npx --yes gh-pages -d dist -b gh-pages
 - Review-only fields (`reviewedBy`, `reviewedDate`, `reviewComment`) are updated only through the Review Modal
 - Record fields also include Build / Phase, Configuration, Measured By, Supplier, Reference
 - Older LocalStorage statuses (Measured / Estimated / Missing) are migrated on read
-- Older saved projects may still contain an optional legacy `expectedItems` field. It is ignored by the UI and is not written when creating or editing projects
+- Older saved projects may still contain unused legacy fields such as `expectedItems` or a project description. They are ignored on load and are not shown or required in the UI
 - UI language: Traditional Chinese / English only (no Simplified Chinese chrome or README)
 
 ## License / scope
