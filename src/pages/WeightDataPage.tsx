@@ -49,7 +49,11 @@ type ColumnKey =
 
 const COLUMN_STORAGE_KEY = 'weightDataVisibleColumns'
 const VIEWS_STORAGE_KEY = 'weightDataSavedViews'
+const DESCRIPTION_WIDTH_KEY = 'weightDataDescriptionWidth'
 const PAGE_SIZE = 15
+const DEFAULT_DESCRIPTION_WIDTH = 230
+const MIN_DESCRIPTION_WIDTH = 120
+const MAX_DESCRIPTION_WIDTH = 560
 
 const COLUMN_OPTIONS: { key: ColumnKey; label: string; locked?: boolean }[] = [
   { key: 'project', label: 'Project', locked: true },
@@ -116,6 +120,17 @@ function loadVisibleColumns(): ColumnKey[] {
   }
 }
 
+function loadDescriptionWidth(): number {
+  try {
+    const raw = localStorage.getItem(DESCRIPTION_WIDTH_KEY)
+    const parsed = raw ? Number(raw) : NaN
+    if (!Number.isFinite(parsed)) return DEFAULT_DESCRIPTION_WIDTH
+    return Math.min(MAX_DESCRIPTION_WIDTH, Math.max(MIN_DESCRIPTION_WIDTH, parsed))
+  } catch {
+    return DEFAULT_DESCRIPTION_WIDTH
+  }
+}
+
 function loadSavedViews(): SavedView[] {
   try {
     const raw = localStorage.getItem(VIEWS_STORAGE_KEY)
@@ -149,6 +164,7 @@ export function WeightDataPage() {
   const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
   const [viewing, setViewing] = useState<WeightRecord | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [descriptionWidth, setDescriptionWidth] = useState(loadDescriptionWidth)
   const appliedDefaultView = useRef(false)
 
   const buildPhaseOptions = useMemo(() => {
@@ -328,6 +344,62 @@ export function WeightDataPage() {
         <button type="button" className="sort-header" onClick={() => cycleSort(key)}>
           {label} {sortIcon(key)}
         </button>
+      </th>
+    )
+  }
+
+  const descriptionColumnStyle = {
+    width: descriptionWidth,
+    minWidth: descriptionWidth,
+    maxWidth: descriptionWidth,
+  }
+
+  function startDescriptionResize(event: React.MouseEvent<HTMLSpanElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    const startX = event.clientX
+    const startWidth = descriptionWidth
+    document.body.classList.add('col-resizing')
+
+    function onMove(moveEvent: MouseEvent) {
+      const next = Math.min(
+        MAX_DESCRIPTION_WIDTH,
+        Math.max(MIN_DESCRIPTION_WIDTH, startWidth + moveEvent.clientX - startX),
+      )
+      setDescriptionWidth(next)
+    }
+
+    function onUp(moveEvent: MouseEvent) {
+      const next = Math.min(
+        MAX_DESCRIPTION_WIDTH,
+        Math.max(MIN_DESCRIPTION_WIDTH, startWidth + moveEvent.clientX - startX),
+      )
+      setDescriptionWidth(next)
+      localStorage.setItem(DESCRIPTION_WIDTH_KEY, String(next))
+      document.body.classList.remove('col-resizing')
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  function descriptionHeader() {
+    return (
+      <th className="weight-table-description" style={descriptionColumnStyle}>
+        <div className="resizable-header">
+          <button type="button" className="sort-header" onClick={() => cycleSort('description')}>
+            Description {sortIcon('description')}
+          </button>
+          <span
+            className="col-resize-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize Description column"
+            onMouseDown={startDescriptionResize}
+          />
+        </div>
       </th>
     )
   }
@@ -551,7 +623,7 @@ export function WeightDataPage() {
                     />
                   </th>
                   {isVisible('project') ? sortableHeader('Project', 'project', 'weight-table-project') : null}
-                  {isVisible('description') ? sortableHeader('Description', 'description', 'weight-table-description') : null}
+                  {isVisible('description') ? descriptionHeader() : null}
                   {isVisible('lenovoPn') ? <th>Lenovo PN</th> : null}
                   {isVisible('customerPn') ? <th>MSFT PN</th> : null}
                   {isVisible('manufacturer') ? <th>Manufacturer</th> : null}
@@ -583,7 +655,7 @@ export function WeightDataPage() {
                     </td>
                     {isVisible('project') ? <td className="weight-table-project">{r.projectCode || '—'}</td> : null}
                     {isVisible('description') ? (
-                      <td className="weight-table-description" title={r.description}>
+                      <td className="weight-table-description" style={descriptionColumnStyle} title={r.description}>
                         <button type="button" className="linkish" onClick={() => setViewing(r)}>
                           {r.description || '—'}
                         </button>

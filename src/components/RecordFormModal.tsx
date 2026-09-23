@@ -156,7 +156,7 @@ export function RecordFormModal({
   } {
     if (!initial) {
       return {
-        status: intent === 'submit' ? 'Pending Review' : 'Draft',
+        status: intent === 'submit' || intent === 'addNext' ? 'Pending Review' : 'Draft',
         reviewedBy: null,
         reviewedDate: null,
         reviewComment: null,
@@ -206,7 +206,7 @@ export function RecordFormModal({
       return null
     }
 
-    if (intent === 'submit' || intent === 'resubmit') {
+    if (intent === 'submit' || intent === 'resubmit' || intent === 'addNext') {
       if (weightValue == null || !(weightValue > 0)) {
         setError('Weight must be greater than zero before submitting for review.')
         return null
@@ -280,7 +280,7 @@ export function RecordFormModal({
       weightUnit: prev.level === 'Part' ? 'g' : prev.weightUnit,
     }))
     setError(null)
-    setSuccess('Draft saved. Ready for the next record.')
+    setSuccess('Submitted. Ready for the next record.')
     window.setTimeout(() => descriptionRef.current?.focus(), 0)
   }
 
@@ -337,11 +337,8 @@ export function RecordFormModal({
           <button type="button" className="button secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="button secondary" onClick={() => handleSave('draft')}>
-            Save Draft
-          </button>
           <button type="button" className="button ghost" onClick={() => handleSave('addNext')}>
-            Save & Add Next
+            Submit & Add Next
           </button>
           <button type="button" className="button" onClick={() => handleSave('submit')}>
             Submit for Review
@@ -594,8 +591,7 @@ export function RecordFormModal({
         </div>
 
         <div className="alert info form-workflow-note">
-          Tester can only choose Draft or Submit for Review. Reviewer and Review Comment are managed in the Review
-          Modal.
+          Tester submits records for review. Reviewer and Review Comment are managed in the Review Modal.
         </div>
       </Modal>
 
