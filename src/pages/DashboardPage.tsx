@@ -267,9 +267,7 @@ export function DashboardPage() {
               return (
                 <div key={project.id} className="dashboard-project-card">
                   <div className="dashboard-project-card-head">
-                    <strong>
-                      {project.code} · {project.name}
-                    </strong>
+                    <strong>{project.code}</strong>
                     <span className="muted">Phase: {project.phase || '—'}</span>
                   </div>
 
