@@ -135,6 +135,14 @@ textarea {
   padding: 12px;
   color: #9fb0c6;
   font-size: 12px;
+  line-height: 1.45;
+}
+
+.sidebar-build {
+  margin-top: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #8aa0ba;
 }
 
 .main {
@@ -667,24 +675,36 @@ tr.clickable:hover {
   cursor: col-resize;
   position: relative;
   z-index: 1;
+  touch-action: none;
+}
+
+.col-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 
 .col-resize-handle::after {
   content: '';
   position: absolute;
-  top: 14%;
-  right: 6px;
-  bottom: 14%;
+  top: 12%;
+  right: 5px;
+  bottom: 12%;
   width: 2px;
   border-radius: 1px;
-  background: #aeb9c8;
+  background: #9aa8b8;
+}
+
+.col-resize-handle:hover,
+body.col-resizing .col-resize-handle {
+  background: rgba(37, 99, 235, 0.06);
 }
 
 .col-resize-handle:hover::after,
 body.col-resizing .col-resize-handle::after {
   background: var(--blue);
   width: 3px;
-  right: 5px;
+  right: 4px;
 }
 
 body.col-resizing {

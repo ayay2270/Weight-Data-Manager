@@ -142,7 +142,7 @@ function loadSavedViews(): SavedView[] {
 }
 
 export function WeightDataPage() {
-  const { projects, records, settings, upsertRecord, deleteRecord, duplicateRecord } = useData()
+  const { projects, records, settings, upsertRecord, deleteRecord } = useData()
   const [params] = useSearchParams()
   const [query, setQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState(params.get('project') || '')
@@ -160,12 +160,14 @@ export function WeightDataPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection | null>(null)
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<WeightRecord | null>(null)
+  const [prefill, setPrefill] = useState<WeightRecord | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
   const [viewing, setViewing] = useState<WeightRecord | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [descriptionWidth, setDescriptionWidth] = useState(loadDescriptionWidth)
   const appliedDefaultView = useRef(false)
+  const resizingDescription = useRef(false)
 
   const buildPhaseOptions = useMemo(() => {
     const values = new Set<string>()
@@ -321,6 +323,7 @@ export function WeightDataPage() {
   }
 
   function cycleSort(key: SortKey) {
+    if (resizingDescription.current) return
     setPage(1)
     if (sortKey !== key) {
       setSortKey(key)
@@ -354,14 +357,16 @@ export function WeightDataPage() {
     maxWidth: descriptionWidth,
   }
 
-  function startDescriptionResize(event: React.MouseEvent<HTMLSpanElement>) {
+  function startDescriptionResize(event: React.PointerEvent<HTMLSpanElement>) {
     event.preventDefault()
     event.stopPropagation()
+    resizingDescription.current = false
     const startX = event.clientX
     const startWidth = descriptionWidth
     document.body.classList.add('col-resizing')
 
-    function onMove(moveEvent: MouseEvent) {
+    function onMove(moveEvent: PointerEvent) {
+      if (Math.abs(moveEvent.clientX - startX) > 2) resizingDescription.current = true
       const next = Math.min(
         MAX_DESCRIPTION_WIDTH,
         Math.max(MIN_DESCRIPTION_WIDTH, startWidth + moveEvent.clientX - startX),
@@ -369,7 +374,7 @@ export function WeightDataPage() {
       setDescriptionWidth(next)
     }
 
-    function onUp(moveEvent: MouseEvent) {
+    function onUp(moveEvent: PointerEvent) {
       const next = Math.min(
         MAX_DESCRIPTION_WIDTH,
         Math.max(MIN_DESCRIPTION_WIDTH, startWidth + moveEvent.clientX - startX),
@@ -377,12 +382,15 @@ export function WeightDataPage() {
       setDescriptionWidth(next)
       localStorage.setItem(DESCRIPTION_WIDTH_KEY, String(next))
       document.body.classList.remove('col-resizing')
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      window.setTimeout(() => {
+        resizingDescription.current = false
+      }, 0)
     }
 
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
   }
 
   function descriptionHeader() {
@@ -397,7 +405,7 @@ export function WeightDataPage() {
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize Description column"
-            onMouseDown={startDescriptionResize}
+            onPointerDown={startDescriptionResize}
             onClick={(event) => event.stopPropagation()}
           />
         </div>
@@ -405,14 +413,28 @@ export function WeightDataPage() {
     )
   }
 
+  function closeForm() {
+    setShowForm(false)
+    setEditing(null)
+    setPrefill(null)
+  }
+
   function openAdd() {
     setEditing(null)
+    setPrefill(null)
     setShowForm(true)
   }
 
   function openEdit(record: WeightRecord) {
     if (!canEditMeasurement(record.status)) return
     setEditing(record)
+    setPrefill(null)
+    setShowForm(true)
+  }
+
+  function openDuplicate(record: WeightRecord) {
+    setEditing(null)
+    setPrefill(record)
     setShowForm(true)
   }
 
@@ -732,7 +754,7 @@ export function WeightDataPage() {
                             type="button"
                             className="button ghost"
                             title="Duplicate"
-                            onClick={() => duplicateRecord(r.id)}
+                            onClick={() => openDuplicate(r)}
                           >
                             <Copy size={15} />
                           </button>
@@ -802,14 +824,15 @@ export function WeightDataPage() {
         projects={projects}
         records={records}
         initial={editing}
+        prefill={prefill}
         defaultProjectId={
           projectFilter ? projects.find((p) => p.code === projectFilter)?.id : settings.defaultProjectId
         }
         defaultUnit={settings.defaultUnit}
-        onClose={() => setShowForm(false)}
+        onClose={closeForm}
         onSave={upsertRecord}
         onOpenExisting={(record) => {
-          setShowForm(false)
+          closeForm()
           setViewing(record)
         }}
       />

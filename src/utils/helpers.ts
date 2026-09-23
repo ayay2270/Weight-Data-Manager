@@ -29,6 +29,11 @@ export function canEditMeasurement(status: string): boolean {
   return status === 'Draft' || status === 'Need Recheck'
 }
 
+/** Projects with child records cannot be deleted from the data layer. */
+export function canDeleteProject(projectId: string, records: WeightRecord[]): boolean {
+  return !records.some((record) => record.projectId === projectId)
+}
+
 const DATA_SOURCE_SET = new Set<string>(DATA_SOURCES)
 const RECORD_STATUS_SET = new Set<string>(RECORD_STATUSES)
 

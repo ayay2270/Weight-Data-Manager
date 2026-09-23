@@ -39,7 +39,10 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-foot">Local browser storage · V1</div>
+      <div className="sidebar-foot">
+        <div>Local browser storage · V1</div>
+        <div className="sidebar-build">Build: {__APP_GIT_COMMIT__}</div>
+      </div>
     </aside>
   )
 }

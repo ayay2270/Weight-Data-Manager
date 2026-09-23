@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { AppData, AppSettings, Project, WeightRecord } from '../data/types'
-import { normalizeWeightRecord, nowIso, uid } from '../utils/helpers'
+import { canDeleteProject, normalizeWeightRecord, nowIso } from '../utils/helpers'
 
 const LOCKED_MEASUREMENT_STATUSES = new Set(['Pending Review', 'Verified', 'Rejected'])
 
@@ -43,10 +43,9 @@ interface DataContextValue {
   settings: AppSettings
   replaceData: (next: AppData) => void
   upsertProject: (project: Project) => void
-  deleteProject: (id: string) => void
+  deleteProject: (id: string) => boolean
   upsertRecord: (record: WeightRecord) => void
   deleteRecord: (id: string) => void
-  duplicateRecord: (id: string) => void
   updateSettings: (patch: Partial<AppSettings>) => void
   resetDemoData: () => void
   getProjectRecords: (projectId: string) => WeightRecord[]
@@ -90,16 +89,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteProject = useCallback((id: string) => {
-    setData((prev) => ({
-      ...prev,
-      projects: prev.projects.filter((p) => p.id !== id),
-      records: prev.records.filter((r) => r.projectId !== id),
-      settings: {
-        ...prev.settings,
-        defaultProjectId: prev.settings.defaultProjectId === id ? null : prev.settings.defaultProjectId,
-        lastUpdated: nowIso(),
-      },
-    }))
+    let deleted = false
+    setData((prev) => {
+      if (!canDeleteProject(id, prev.records)) return prev
+      deleted = true
+      return {
+        ...prev,
+        projects: prev.projects.filter((p) => p.id !== id),
+        settings: {
+          ...prev.settings,
+          defaultProjectId: prev.settings.defaultProjectId === id ? null : prev.settings.defaultProjectId,
+          lastUpdated: nowIso(),
+        },
+      }
+    })
+    return deleted
   }, [])
 
   const upsertRecord = useCallback((record: WeightRecord) => {
@@ -137,30 +141,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const duplicateRecord = useCallback((id: string) => {
-    setData((prev) => {
-      const src = prev.records.find((r) => r.id === id)
-      if (!src) return prev
-      const stamp = nowIso()
-      const copy: WeightRecord = {
-        ...normalizeWeightRecord(src),
-        id: uid('rec'),
-        description: `${src.description} (copy)`,
-        status: 'Draft',
-        reviewedBy: null,
-        reviewedDate: null,
-        reviewComment: null,
-        createdAt: stamp,
-        updatedAt: stamp,
-      }
-      return {
-        ...prev,
-        records: [copy, ...prev.records],
-        settings: { ...prev.settings, lastUpdated: stamp },
-      }
-    })
-  }, [])
-
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setData((prev) => ({
       ...prev,
@@ -189,7 +169,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteProject,
       upsertRecord,
       deleteRecord,
-      duplicateRecord,
       updateSettings,
       resetDemoData,
       getProjectRecords,
@@ -201,7 +180,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteProject,
       upsertRecord,
       deleteRecord,
-      duplicateRecord,
       updateSettings,
       resetDemoData,
       getProjectRecords,

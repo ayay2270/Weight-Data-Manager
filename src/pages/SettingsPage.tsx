@@ -7,12 +7,15 @@ import {
   Info,
   Upload,
 } from 'lucide-react'
+import { Modal } from '../components/Modal'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
 import { downloadBlob } from '../utils/helpers'
 import { exportBackupJson, importBackupJson } from '../utils/storage'
 
 const LAST_BACKUP_KEY = 'wdm.v1.lastBackupAt'
+
+type ConfirmAction = 'restore-backup' | 'restore-demo' | null
 
 function readLastBackupAt(): string | null {
   try {
@@ -33,7 +36,10 @@ function formatBackupTime(iso: string | null): string {
 export function SettingsPage() {
   const { resetDemoData, replaceData, data } = useData()
   const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(() => readLastBackupAt())
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
+  const [pendingBackupFile, setPendingBackupFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function downloadBackup() {
@@ -45,53 +51,43 @@ export function SettingsPage() {
       // ignore storage write failures
     }
     setLastBackupAt(stamp)
+    setError(null)
     setMessage('Full backup downloaded.')
   }
 
   async function restoreBackup(file: File) {
-    const confirmed = window.confirm(
-      [
-        'Restore this full backup into this browser?',
-        '',
-        'This will replace:',
-        '• Current projects',
-        '• Current weight records',
-        '• Current local settings',
-        '',
-        'Continue?',
-      ].join('\n'),
-    )
-    if (!confirmed) return
-
     try {
       const text = await file.text()
       replaceData(importBackupJson(text))
+      setError(null)
       setMessage('Full backup restored into LocalStorage.')
     } catch {
       setMessage(null)
-      window.alert('Could not restore backup. Use a JSON file exported from this app.')
+      setError('Could not restore backup. Use a JSON file exported from this app.')
     }
   }
 
   function restoreDemo() {
-    const confirmed = window.confirm(
-      [
-        'Restore Demo Data?',
-        '',
-        'This will permanently replace:',
-        '• Current projects',
-        '• Current weight records',
-        '• Current local settings',
-        '',
-        'Sample data from Weight Measurement Record_X01.xlsx will be loaded.',
-        'This cannot be undone unless you have a backup.',
-        '',
-        'Continue?',
-      ].join('\n'),
-    )
-    if (!confirmed) return
     resetDemoData()
+    setError(null)
     setMessage('Demo data restored from X01 seed.')
+  }
+
+  function closeConfirm() {
+    setConfirmAction(null)
+    setPendingBackupFile(null)
+  }
+
+  async function confirmActionProceed() {
+    if (confirmAction === 'restore-backup' && pendingBackupFile) {
+      await restoreBackup(pendingBackupFile)
+      closeConfirm()
+      return
+    }
+    if (confirmAction === 'restore-demo') {
+      restoreDemo()
+      closeConfirm()
+    }
   }
 
   return (
@@ -103,6 +99,7 @@ export function SettingsPage() {
       />
       <div className="content">
         {message ? <div className="alert success">{message}</div> : null}
+        {error ? <div className="alert error">{error}</div> : null}
 
         <div className="settings-layout">
           <div className="settings-main">
@@ -137,10 +134,11 @@ export function SettingsPage() {
                   type="file"
                   accept="application/json,.json"
                   hidden
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    await restoreBackup(file)
+                    setPendingBackupFile(file)
+                    setConfirmAction('restore-backup')
                     e.target.value = ''
                   }}
                 />
@@ -179,7 +177,7 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <button type="button" className="button danger" onClick={restoreDemo}>
+              <button type="button" className="button danger" onClick={() => setConfirmAction('restore-demo')}>
                 Restore Demo Data
               </button>
             </div>
@@ -209,6 +207,51 @@ export function SettingsPage() {
           </aside>
         </div>
       </div>
+
+      {confirmAction === 'restore-backup' ? (
+        <Modal
+          title="Restore Backup"
+          onClose={closeConfirm}
+          footer={
+            <>
+              <button type="button" className="button secondary" onClick={closeConfirm}>
+                Cancel
+              </button>
+              <button type="button" className="button danger" onClick={confirmActionProceed}>
+                Restore
+              </button>
+            </>
+          }
+        >
+          <p>
+            This will replace the current local data with the selected backup, including projects, weight records, and
+            settings.
+          </p>
+          {pendingBackupFile ? <p className="muted">File: {pendingBackupFile.name}</p> : null}
+        </Modal>
+      ) : null}
+
+      {confirmAction === 'restore-demo' ? (
+        <Modal
+          title="Restore Demo Data"
+          onClose={closeConfirm}
+          footer={
+            <>
+              <button type="button" className="button secondary" onClick={closeConfirm}>
+                Cancel
+              </button>
+              <button type="button" className="button danger" onClick={confirmActionProceed}>
+                Restore Demo Data
+              </button>
+            </>
+          }
+        >
+          <p>
+            This will permanently replace your current projects, weight records, and local settings with the sample
+            dataset from Weight Measurement Record_X01.xlsx.
+          </p>
+        </Modal>
+      ) : null}
     </>
   )
 }

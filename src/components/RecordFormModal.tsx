@@ -11,6 +11,7 @@ interface RecordFormModalProps {
   projects: Project[]
   records?: WeightRecord[]
   initial?: WeightRecord | null
+  prefill?: WeightRecord | null
   defaultProjectId?: string | null
   defaultUnit?: WeightUnit
   onClose: () => void
@@ -60,6 +61,7 @@ export function RecordFormModal({
   projects,
   records = [],
   initial,
+  prefill,
   defaultProjectId,
   defaultUnit = 'kg',
   onClose,
@@ -99,6 +101,26 @@ export function RecordFormModal({
         measuredDate: initial.measuredDate || '',
         note: initial.note || '',
       })
+    } else if (prefill) {
+      setForm({
+        projectId: prefill.projectId,
+        buildPhase: prefill.buildPhase || '',
+        level: prefill.level,
+        description: prefill.description,
+        lenovoPn: prefill.lenovoPn || '',
+        customerPn: prefill.customerPn || '',
+        manufacturer: prefill.manufacturer || '',
+        category: prefill.category || '',
+        weightValue: prefill.weightValue != null ? String(prefill.weightValue) : '',
+        weightUnit: prefill.weightUnit,
+        configuration: prefill.configuration || '',
+        source: prefill.source,
+        supplier: prefill.supplier || '',
+        reference: prefill.reference || '',
+        measuredBy: prefill.measuredBy || '',
+        measuredDate: prefill.measuredDate || todayDate(),
+        note: prefill.note || '',
+      })
     } else {
       const projectId = defaultProjectId || projects[0]?.id || ''
       const project = projects.find((p) => p.id === projectId)
@@ -115,7 +137,7 @@ export function RecordFormModal({
     setError(null)
     setSuccess(null)
     setPending(null)
-  }, [open, initial, defaultProjectId, defaultUnit, projects])
+  }, [open, initial, prefill, defaultProjectId, defaultUnit, projects])
 
   const showPartFields = form.level === 'Part' || form.level === 'Node' || form.level === 'Rack'
   const showPackageHint = form.level === 'Package'
@@ -603,9 +625,6 @@ export function RecordFormModal({
           </label>
         </div>
 
-        <div className="alert info form-workflow-note">
-          Tester submits records for review. Reviewer and Review Comment are managed in the Review Modal.
-        </div>
       </Modal>
 
       {pending ? (

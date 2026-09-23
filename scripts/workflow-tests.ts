@@ -1,6 +1,6 @@
 import { exportCsv } from '../src/utils/io'
 import { findPossibleDuplicate } from '../src/utils/duplicates'
-import { migrateRecordStatus, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
+import { canDeleteProject, migrateRecordStatus, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
 import { normalizeAppData } from '../src/utils/storage'
 import type { AppData, WeightRecord } from '../src/data/types'
 
@@ -326,6 +326,16 @@ assertEqual(
   ),
   null,
   'non-duplicate returns null',
+)
+
+assertEqual(canDeleteProject('prj_empty', []), true, 'empty project can be deleted')
+assertEqual(
+  canDeleteProject(
+    'prj_s219b',
+    [{ id: 'rec1', projectId: 'prj_s219b', projectCode: 'S219B', level: 'Part', description: 'x', weightUnit: 'g', source: 'Unknown', status: 'Draft', createdAt: '', updatedAt: '' }],
+  ),
+  false,
+  'project with records cannot be deleted',
 )
 
 console.log('Workflow verification complete.')
