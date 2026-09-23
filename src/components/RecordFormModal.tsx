@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
 import { DATA_SOURCES, LEVELS } from '../data/types'
 import { findPossibleDuplicate } from '../utils/duplicates'
-import { nowIso, toWeightKg, uid } from '../utils/helpers'
+import { nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
 import { DuplicateWarningModal, type DuplicateDraft } from './DuplicateWarningModal'
 import { Modal } from './Modal'
 
@@ -100,6 +100,7 @@ export function RecordFormModal({
         buildPhase: project?.phase || '',
         level,
         weightUnit: level === 'Part' ? 'g' : defaultUnit,
+        measuredDate: todayDate(),
       })
     }
     setError(null)
@@ -192,10 +193,6 @@ export function RecordFormModal({
     const project = projects.find((p) => p.id === form.projectId)
     if (!project) {
       setError('Please select a project.')
-      return null
-    }
-    if (!form.description.trim()) {
-      setError('Description is required.')
       return null
     }
     const weightValue = form.weightValue.trim() === '' ? null : Number(form.weightValue)
@@ -417,7 +414,7 @@ export function RecordFormModal({
 
         <div className="form-grid">
           <label>
-            Project
+            Project *
             <select value={form.projectId} onChange={(e) => setProject(e.target.value)}>
               <option value="">Select project…</option>
               {activeProjects.map((p) => (
@@ -490,7 +487,7 @@ export function RecordFormModal({
           ) : null}
 
           <label className="span-2">
-            Weight
+            Weight *
             <div className="weight-input">
               <input
                 type="number"
@@ -551,7 +548,7 @@ export function RecordFormModal({
             </select>
           </label>
           <label className={showSupplierEmphasis ? undefined : 'soft-field'}>
-            Supplier / Data Provider
+            Supplier / Data Provider{showSupplierEmphasis ? ' *' : ''}
             <input
               value={form.supplier}
               onChange={(e) => setForm({ ...form, supplier: e.target.value })}
@@ -568,7 +565,7 @@ export function RecordFormModal({
           </label>
 
           <label>
-            Measured By
+            Measured By *
             <input
               value={form.measuredBy}
               onChange={(e) => setForm({ ...form, measuredBy: e.target.value })}
@@ -576,7 +573,7 @@ export function RecordFormModal({
             />
           </label>
           <label>
-            Measured Date
+            Measured Date *
             <input
               type="date"
               value={form.measuredDate}
