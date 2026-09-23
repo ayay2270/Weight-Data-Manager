@@ -103,7 +103,7 @@ export function ProjectsPage() {
       <div className="content">
         <div className="filter-bar">
           <input
-            placeholder="Search project code or description..."
+            placeholder="Search project code..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -124,11 +124,10 @@ export function ProjectsPage() {
 
         <div className="panel">
           <div className="table-wrap">
-            <table>
+            <table className="projects-table">
               <thead>
                 <tr>
                   <th>Project</th>
-                  <th>Description</th>
                   <th>Phase</th>
                   <th>Status</th>
                   <th>Records</th>
@@ -149,12 +148,11 @@ export function ProjectsPage() {
                   )
                   return (
                     <tr key={project.id}>
-                      <td>
+                      <td className="projects-table-project">
                         <Link to={`/projects/${project.id}`} style={{ color: 'var(--blue)', fontWeight: 700 }}>
                           {project.code}
                         </Link>
                       </td>
-                      <td>{project.name || '—'}</td>
                       <td>{project.phase || '—'}</td>
                       <td>
                         <span className={`badge ${project.status}`}>{project.status}</span>
@@ -173,7 +171,7 @@ export function ProjectsPage() {
                 })}
                 {!filtered.length ? (
                   <tr>
-                    <td colSpan={9} className="empty">
+                    <td colSpan={8} className="empty">
                       No projects found.
                     </td>
                   </tr>
