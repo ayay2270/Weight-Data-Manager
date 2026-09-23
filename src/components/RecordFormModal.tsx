@@ -48,9 +48,10 @@ function configRequirement(level: Level): 'optional' | 'recommended' | 'required
 
 function RequiredLabel({ children }: { children: string }) {
   return (
-    <>
-      <span className="required-mark" aria-hidden="true">*</span> {children}
-    </>
+    <span className="required-label">
+      <span className="required-mark" aria-hidden="true">*</span>
+      {children}
+    </span>
   )
 }
 

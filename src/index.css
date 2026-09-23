@@ -951,6 +951,12 @@ body.col-resizing {
   font-weight: 600;
 }
 
+.required-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .required-mark {
   color: var(--red);
 }
