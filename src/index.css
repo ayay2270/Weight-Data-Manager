@@ -945,21 +945,18 @@ tr.clickable:hover {
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.form-status-reason {
+  font-size: 0.875rem;
+  white-space: pre-wrap;
 }
 
 .alert.warn {
   background: #fff8eb;
   color: #8a5a00;
   border-color: #f0d6a0;
-}
-
-.alert.warn.review-context p {
-  margin: 8px 0;
-  white-space: pre-wrap;
-}
-
-.alert.warn.review-context small {
-  display: block;
 }
 
 .modal-body {

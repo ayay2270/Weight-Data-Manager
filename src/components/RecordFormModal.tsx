@@ -112,7 +112,10 @@ export function RecordFormModal({
   const showSupplierEmphasis = form.source === 'Supplier'
   const convertedKg = form.weightValue.trim() === '' ? null : toWeightKg(Number(form.weightValue), form.weightUnit)
   const currentStatus: RecordStatus | null = initial?.status ?? null
-  const showRecheckContext = currentStatus === 'Need Recheck' && Boolean(initial?.reviewComment)
+  const recheckReason =
+    currentStatus === 'Need Recheck' && initial?.reviewComment?.trim()
+      ? initial.reviewComment.trim()
+      : null
   const configRule = configRequirement(form.level)
   const configEmpty = !form.configuration.trim()
 
@@ -404,16 +407,11 @@ export function RecordFormModal({
           <div className="form-status-banner">
             <span className="muted">Current status</span>
             <span className={`badge ${currentStatus.replace(/\s+/g, '-')}`}>{currentStatus}</span>
-          </div>
-        ) : null}
-
-        {showRecheckContext ? (
-          <div className="alert warn review-context">
-            <strong>Need Recheck reason</strong>
-            <p>{initial?.reviewComment}</p>
-            <small className="muted">
-              Review fields are managed in Review workflow. Update measurement data, then Resubmit for Review.
-            </small>
+            {recheckReason ? (
+              <span className="form-status-reason">
+                <span className="muted">Reason:</span> {recheckReason}
+              </span>
+            ) : null}
           </div>
         ) : null}
 
