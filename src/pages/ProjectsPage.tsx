@@ -127,6 +127,7 @@ export function ProjectsPage() {
                   <th>Project</th>
                   <th>Phase</th>
                   <th>Status</th>
+                  <th>Notes</th>
                   <th>Records</th>
                   <th>Pending Review</th>
                   <th>Verified</th>
@@ -154,6 +155,9 @@ export function ProjectsPage() {
                       <td>
                         <span className={`badge ${project.status}`}>{project.status}</span>
                       </td>
+                      <td className="projects-table-notes" title={project.notes || undefined}>
+                        {project.notes || '—'}
+                      </td>
                       <td>{projectRecords.length}</td>
                       <td>{pending}</td>
                       <td>{verified}</td>
@@ -168,7 +172,7 @@ export function ProjectsPage() {
                 })}
                 {!filtered.length ? (
                   <tr>
-                    <td colSpan={8} className="empty">
+                    <td colSpan={9} className="empty">
                       No projects found.
                     </td>
                   </tr>

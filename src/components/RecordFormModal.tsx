@@ -46,6 +46,14 @@ function configRequirement(level: Level): 'optional' | 'recommended' | 'required
   return 'optional'
 }
 
+function RequiredLabel({ children }: { children: string }) {
+  return (
+    <>
+      <span className="required-mark" aria-hidden="true">*</span> {children}
+    </>
+  )
+}
+
 export function RecordFormModal({
   open,
   projects,
@@ -411,7 +419,7 @@ export function RecordFormModal({
 
         <div className="form-grid">
           <label>
-            Project *
+            <RequiredLabel>Project</RequiredLabel>
             <select value={form.projectId} onChange={(e) => setProject(e.target.value)}>
               <option value="">Select project…</option>
               {activeProjects.map((p) => (
@@ -484,7 +492,7 @@ export function RecordFormModal({
           ) : null}
 
           <label className="span-2">
-            Weight *
+            <RequiredLabel>Weight</RequiredLabel>
             <div className="weight-input">
               <input
                 type="number"
@@ -508,7 +516,11 @@ export function RecordFormModal({
           </label>
 
           <label className="span-2">
-            Configuration / Included Items{configRule === 'required' ? ' *' : ''}
+            {configRule === 'required' ? (
+              <RequiredLabel>Configuration / Included Items</RequiredLabel>
+            ) : (
+              'Configuration / Included Items'
+            )}
             <textarea
               rows={2}
               value={form.configuration}
@@ -545,7 +557,7 @@ export function RecordFormModal({
             </select>
           </label>
           <label className={showSupplierEmphasis ? undefined : 'soft-field'}>
-            Supplier / Data Provider{showSupplierEmphasis ? ' *' : ''}
+            {showSupplierEmphasis ? <RequiredLabel>Supplier / Data Provider</RequiredLabel> : 'Supplier / Data Provider'}
             <input
               value={form.supplier}
               onChange={(e) => setForm({ ...form, supplier: e.target.value })}
@@ -562,7 +574,7 @@ export function RecordFormModal({
           </label>
 
           <label>
-            Measured By *
+            <RequiredLabel>Measured By</RequiredLabel>
             <input
               value={form.measuredBy}
               onChange={(e) => setForm({ ...form, measuredBy: e.target.value })}
@@ -570,7 +582,7 @@ export function RecordFormModal({
             />
           </label>
           <label>
-            Measured Date *
+            <RequiredLabel>Measured Date</RequiredLabel>
             <input
               type="date"
               value={form.measuredDate}
