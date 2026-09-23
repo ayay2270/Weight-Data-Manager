@@ -1,36 +1,82 @@
+import { useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Lightbulb } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { useData } from '../hooks/useData'
+import { loadExportContext } from '../utils/exportContext'
 import { downloadBlob } from '../utils/helpers'
 import { exportCsv, exportWorkbook } from '../utils/io'
+import type { WeightRecord } from '../data/types'
+
+type ExportScope = 'all' | 'filtered' | 'project' | 'selected'
+type ExportFormat = 'xlsx' | 'csv'
 
 export function ExportPage() {
-  const { data } = useData()
+  const { data, projects } = useData()
+  const context = loadExportContext()
+  const [scope, setScope] = useState<ExportScope>('all')
+  const [projectCode, setProjectCode] = useState(projects[0]?.code || '')
+  const [format, setFormat] = useState<ExportFormat>('xlsx')
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  function exportExcel() {
-    const buffer = exportWorkbook(data)
-    downloadBlob(
-      new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      }),
-      `weight-data-${new Date().toISOString().slice(0, 10)}.xlsx`,
-    )
+  const selectedCount = context.selectedIds.length
+  const filteredCount = context.filteredIds.length
+
+  function resolveRecords(): WeightRecord[] | null {
+    if (scope === 'all') return data.records
+    if (scope === 'filtered') {
+      if (!filteredCount) {
+        setError('No Current Filtered View is available. Open Weight Data, apply filters, then return here.')
+        return null
+      }
+      const idSet = new Set(context.filteredIds)
+      return data.records.filter((r) => idSet.has(r.id))
+    }
+    if (scope === 'project') {
+      if (!projectCode) {
+        setError('Please select a project.')
+        return null
+      }
+      return data.records.filter((r) => r.projectCode === projectCode)
+    }
+    if (!selectedCount) {
+      setError('No rows selected. Open Weight Data and check the rows you want to export.')
+      return null
+    }
+    const idSet = new Set(context.selectedIds)
+    return data.records.filter((r) => idSet.has(r.id))
   }
 
-  function exportCsvFile() {
-    downloadBlob(
-      new Blob([exportCsv(data)], { type: 'text/csv;charset=utf-8' }),
-      `weight-data-${new Date().toISOString().slice(0, 10)}.csv`,
-    )
+  function runExport() {
+    setMessage(null)
+    setError(null)
+    const subset = resolveRecords()
+    if (!subset) return
+    const stamp = new Date().toISOString().slice(0, 10)
+    if (format === 'xlsx') {
+      const buffer = exportWorkbook(data, subset)
+      downloadBlob(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `weight-data-${stamp}.xlsx`,
+      )
+    } else {
+      downloadBlob(new Blob([exportCsv(data, subset)], { type: 'text/csv;charset=utf-8' }), `weight-data-${stamp}.csv`)
+    }
+    setMessage(`Exported ${subset.length} record(s) as ${format === 'xlsx' ? 'Excel' : 'CSV'}.`)
   }
 
   return (
     <>
       <PageHeader
         title="Export"
-        subtitle="Export the current local database to Excel or CSV for backup, analysis, or sharing."
+        subtitle="Export weight records by scope — all data, current filtered view, a project, or selected rows."
       />
       <div className="content">
+        {message ? <div className="alert success">{message}</div> : null}
+        {error ? <div className="alert error">{error}</div> : null}
+
         <div className="export-layout">
           <div className="export-main">
             <div className="panel export-card">
@@ -38,42 +84,112 @@ export function ExportPage() {
                 <div className="section-title">
                   <Download size={18} className="section-title-icon" />
                   <div>
-                    <h2>Export</h2>
-                    <p>Current LocalStorage database · {data.records.length} records</p>
+                    <h2>Export Weight Data</h2>
+                    <p>LocalStorage database · {data.records.length} total records</p>
                   </div>
                 </div>
               </div>
-              <p className="export-intro">
-                Export the current weight database to Excel or CSV format. The exported file can be used for backup,
-                analysis, or sharing.
-              </p>
 
-              <div className="export-option-grid">
-                <button type="button" className="export-option export-option-primary" onClick={exportExcel}>
-                  <FileSpreadsheet size={22} />
-                  <span className="export-option-body">
-                    <strong>Export to Excel (.xlsx)</strong>
-                    <small>Recommended format with multiple sheets</small>
+              <div className="export-scope-block">
+                <h3>Export Scope</h3>
+                <label className="export-radio">
+                  <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} />
+                  <span>
+                    <strong>All Records</strong>
+                    <small>Export every weight record in this browser.</small>
                   </span>
-                  <span className="export-option-badge">Recommended</span>
-                </button>
-                <button type="button" className="export-option export-option-secondary" onClick={exportCsvFile}>
-                  <FileText size={22} />
-                  <span className="export-option-body">
-                    <strong>Export to CSV (.csv)</strong>
-                    <small>Flat file format / single sheet</small>
+                </label>
+                <label className="export-radio">
+                  <input
+                    type="radio"
+                    name="scope"
+                    checked={scope === 'filtered'}
+                    onChange={() => setScope('filtered')}
+                  />
+                  <span>
+                    <strong>Current Filtered View{filteredCount ? ` (${filteredCount})` : ''}</strong>
+                    <small>Uses the latest Weight Data search / filters / saved view.</small>
                   </span>
-                </button>
+                </label>
+                <label className="export-radio">
+                  <input
+                    type="radio"
+                    name="scope"
+                    checked={scope === 'project'}
+                    onChange={() => setScope('project')}
+                  />
+                  <span>
+                    <strong>Current Project</strong>
+                    <small>Export records for one project only.</small>
+                  </span>
+                </label>
+                {scope === 'project' ? (
+                  <select
+                    className="export-project-select"
+                    value={projectCode}
+                    onChange={(e) => setProjectCode(e.target.value)}
+                    aria-label="Project to export"
+                  >
+                    {!projects.length ? <option value="">No projects</option> : null}
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.code}>
+                        {p.code} — {p.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <label className={`export-radio${selectedCount ? '' : ' disabled'}`}>
+                  <input
+                    type="radio"
+                    name="scope"
+                    checked={scope === 'selected'}
+                    disabled={!selectedCount}
+                    onChange={() => setScope('selected')}
+                  />
+                  <span>
+                    <strong>Selected Records ({selectedCount})</strong>
+                    <small>
+                      {selectedCount
+                        ? 'Export only checked rows from Weight Data.'
+                        : 'Select rows on the Weight Data page first.'}
+                    </small>
+                  </span>
+                </label>
               </div>
 
-              <div className="export-includes-panel">
-                <h3>Exported Data Includes</h3>
-                <ul>
-                  <li>All weight records with complete information</li>
-                  <li>Project / Build / Phase · Configuration / Included Items</li>
-                  <li>Source / Supplier / Reference · Measured By / Reviewed By · Status</li>
-                  <li>Normalized Weight in kg</li>
-                </ul>
+              <div className="export-scope-block">
+                <h3>Export Format</h3>
+                <label className="export-radio">
+                  <input
+                    type="radio"
+                    name="format"
+                    checked={format === 'xlsx'}
+                    onChange={() => setFormat('xlsx')}
+                  />
+                  <span className="export-format-option">
+                    <FileSpreadsheet size={18} />
+                    <span>
+                      <strong>Excel (.xlsx)</strong>
+                      <small>Recommended · multiple sheets by level</small>
+                    </span>
+                  </span>
+                </label>
+                <label className="export-radio">
+                  <input type="radio" name="format" checked={format === 'csv'} onChange={() => setFormat('csv')} />
+                  <span className="export-format-option">
+                    <FileText size={18} />
+                    <span>
+                      <strong>CSV (.csv)</strong>
+                      <small>Flat file · single sheet</small>
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="export-actions">
+                <button type="button" className="button" onClick={runExport}>
+                  <Download size={16} /> Export
+                </button>
               </div>
             </div>
 
@@ -85,10 +201,9 @@ export function ExportPage() {
                 </div>
               </div>
               <ul className="tips-list">
-                <li>Use export to create a backup of your local data.</li>
-                <li>Exported files can be used for analysis or reporting.</li>
-                <li>For normal data collection, add records directly through Weight Data.</li>
-                <li>JSON backup and restore are available in Settings.</li>
+                <li>Apply filters or select rows on Weight Data before using Filtered View / Selected Records.</li>
+                <li>JSON full backup remains available in Settings.</li>
+                <li>Export never imports files — measurement entry stays in Weight Data.</li>
               </ul>
             </div>
           </div>

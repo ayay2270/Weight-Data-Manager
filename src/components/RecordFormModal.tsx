@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
 import { DATA_SOURCES, LEVELS } from '../data/types'
+import { findPossibleDuplicate } from '../utils/duplicates'
 import { nowIso, toWeightKg, uid } from '../utils/helpers'
+import { DuplicateWarningModal, type DuplicateDraft } from './DuplicateWarningModal'
 import { Modal } from './Modal'
 
 interface RecordFormModalProps {
   open: boolean
   projects: Project[]
+  records?: WeightRecord[]
   initial?: WeightRecord | null
   defaultProjectId?: string | null
   defaultUnit?: WeightUnit
   onClose: () => void
   onSave: (record: WeightRecord) => void
+  onOpenExisting?: (record: WeightRecord) => void
 }
 
 type SaveIntent = 'draft' | 'submit' | 'resubmit' | 'keep' | 'addNext'
@@ -36,18 +40,32 @@ const emptyForm = {
   note: '',
 }
 
+function configRequirement(level: Level): 'optional' | 'recommended' | 'required' {
+  if (level === 'Rack') return 'required'
+  if (level === 'Node' || level === 'Package') return 'recommended'
+  return 'optional'
+}
+
 export function RecordFormModal({
   open,
   projects,
+  records = [],
   initial,
   defaultProjectId,
   defaultUnit = 'kg',
   onClose,
   onSave,
+  onOpenExisting,
 }: RecordFormModalProps) {
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [pending, setPending] = useState<{
+    intent: SaveIntent
+    record: WeightRecord
+    duplicate: WeightRecord
+    draft: DuplicateDraft
+  } | null>(null)
   const descriptionRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -86,6 +104,7 @@ export function RecordFormModal({
     }
     setError(null)
     setSuccess(null)
+    setPending(null)
   }, [open, initial, defaultProjectId, defaultUnit, projects])
 
   const showPartFields = form.level === 'Part' || form.level === 'Node' || form.level === 'Rack'
@@ -94,6 +113,8 @@ export function RecordFormModal({
   const convertedKg = form.weightValue.trim() === '' ? null : toWeightKg(Number(form.weightValue), form.weightUnit)
   const currentStatus: RecordStatus | null = initial?.status ?? null
   const showRecheckContext = currentStatus === 'Need Recheck' && Boolean(initial?.reviewComment)
+  const configRule = configRequirement(form.level)
+  const configEmpty = !form.configuration.trim()
 
   const activeProjects = useMemo(
     () => projects.filter((p) => p.status === 'Active' || p.id === form.projectId),
@@ -107,13 +128,13 @@ export function RecordFormModal({
       ...prev,
       level,
       category: level === 'Package' && !prev.category ? 'Packaging' : prev.category,
+      weightUnit: level === 'Part' ? 'g' : prev.weightUnit === 'g' ? defaultUnit : prev.weightUnit,
     }))
   }
 
   function setProject(projectId: string) {
     setForm((prev) => {
       const project = projects.find((p) => p.id === projectId)
-      // Only default Build / Phase from project when creating a new record.
       if (initial) return { ...prev, projectId }
       return {
         ...prev,
@@ -164,30 +185,39 @@ export function RecordFormModal({
     }
   }
 
-  function handleSave(intent: SaveIntent) {
+  function buildRecord(intent: SaveIntent): WeightRecord | null {
     const project = projects.find((p) => p.id === form.projectId)
     if (!project) {
       setError('Please select a project.')
-      return
+      return null
     }
     if (!form.description.trim()) {
       setError('Description is required.')
-      return
+      return null
     }
     const weightValue = form.weightValue.trim() === '' ? null : Number(form.weightValue)
     if (form.weightValue.trim() !== '' && !Number.isFinite(weightValue)) {
       setError('Weight must be a valid number.')
-      return
+      return null
     }
 
     const resolved = resolveStatus(intent)
     if (resolved.status === 'Pending Review' && (weightValue == null || weightValue <= 0)) {
       setError('Pending Review records need a weight greater than zero.')
-      return
+      return null
+    }
+
+    if (
+      (intent === 'submit' || intent === 'resubmit') &&
+      configRule === 'required' &&
+      configEmpty
+    ) {
+      setError('Please specify what is included in this rack.')
+      return null
     }
 
     const stamp = nowIso()
-    onSave({
+    return {
       id: initial?.id || uid('rec'),
       projectId: project.id,
       projectCode: project.code,
@@ -215,7 +245,11 @@ export function RecordFormModal({
       originalWeightText: initial?.originalWeightText || null,
       createdAt: initial?.createdAt || stamp,
       updatedAt: stamp,
-    })
+    }
+  }
+
+  function commitRecord(intent: SaveIntent, record: WeightRecord) {
+    onSave(record)
     if (intent !== 'addNext' || initial) {
       onClose()
       return
@@ -233,6 +267,52 @@ export function RecordFormModal({
     setError(null)
     setSuccess('Draft saved. Ready for the next record.')
     window.setTimeout(() => descriptionRef.current?.focus(), 0)
+  }
+
+  function handleSave(intent: SaveIntent) {
+    setError(null)
+    const record = buildRecord(intent)
+    if (!record) return
+
+    // Duplicate check only for brand-new records.
+    if (!initial) {
+      const duplicate = findPossibleDuplicate(
+        {
+          projectId: record.projectId,
+          buildPhase: record.buildPhase,
+          level: record.level,
+          description: record.description,
+          lenovoPn: record.lenovoPn,
+          configuration: record.configuration,
+        },
+        records,
+      )
+      if (duplicate) {
+        const weightLabel =
+          record.weightValue == null
+            ? '—'
+            : `${record.weightValue} ${record.weightUnit} (${(record.weight_kg ?? 0).toFixed(3)} kg)`
+        setPending({
+          intent,
+          record,
+          duplicate,
+          draft: {
+            projectCode: record.projectCode,
+            buildPhase: record.buildPhase,
+            level: record.level,
+            description: record.description,
+            lenovoPn: record.lenovoPn,
+            configuration: record.configuration,
+            weightLabel,
+            measuredDate: record.measuredDate,
+            measuredBy: record.measuredBy,
+          },
+        })
+        return
+      }
+    }
+
+    commitRecord(intent, record)
   }
 
   function footerActions() {
@@ -300,190 +380,233 @@ export function RecordFormModal({
   }
 
   return (
-    <Modal title={initial ? 'Edit Weight Record' : 'Add Weight Record'} onClose={onClose} footer={footerActions()}>
-      {error ? <div className="alert error">{error}</div> : null}
-      {success ? <div className="alert success">{success}</div> : null}
+    <>
+      <Modal title={initial ? 'Edit Weight Record' : 'Add Weight Record'} onClose={onClose} footer={footerActions()}>
+        {error ? <div className="alert error">{error}</div> : null}
+        {success ? <div className="alert success">{success}</div> : null}
 
-      {currentStatus ? (
-        <div className="form-status-banner">
-          <span className="muted">Current status</span>
-          <span className={`badge ${currentStatus.replace(/\s+/g, '-')}`}>{currentStatus}</span>
-        </div>
-      ) : null}
-
-      {showRecheckContext ? (
-        <div className="alert warn review-context">
-          <strong>Need Recheck reason</strong>
-          <p>{initial?.reviewComment}</p>
-          <small className="muted">
-            Review fields are managed in Review workflow. Update measurement data, then Resubmit for Review.
-          </small>
-        </div>
-      ) : null}
-
-      <div className="form-grid">
-        <label>
-          Project
-          <select value={form.projectId} onChange={(e) => setProject(e.target.value)}>
-            <option value="">Select project…</option>
-            {activeProjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Build / Phase
-          <input
-            value={form.buildPhase}
-            onChange={(e) => setForm({ ...form, buildPhase: e.target.value })}
-            placeholder="e.g. DV, PVT"
-          />
-        </label>
-        <label>
-          Level
-          <select value={form.level} onChange={(e) => setLevel(e.target.value as Level)}>
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="span-2">
-          Part Description
-          <input
-            ref={descriptionRef}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Part / node / rack / package description"
-          />
-        </label>
-        <label>
-          Lenovo PN
-          <input value={form.lenovoPn} onChange={(e) => setForm({ ...form, lenovoPn: e.target.value })} />
-        </label>
-        <label>
-          MSFT / Customer PN
-          <input value={form.customerPn} onChange={(e) => setForm({ ...form, customerPn: e.target.value })} />
-        </label>
-        {showPartFields ? (
-          <>
-            <label>
-              Manufacturer
-              <input
-                value={form.manufacturer}
-                onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
-              />
-            </label>
-            <label>
-              Part Category
-              <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-            </label>
-          </>
+        {currentStatus ? (
+          <div className="form-status-banner">
+            <span className="muted">Current status</span>
+            <span className={`badge ${currentStatus.replace(/\s+/g, '-')}`}>{currentStatus}</span>
+          </div>
         ) : null}
-        {showPackageHint ? (
-          <label className="span-2">
-            Part Category
+
+        {showRecheckContext ? (
+          <div className="alert warn review-context">
+            <strong>Need Recheck reason</strong>
+            <p>{initial?.reviewComment}</p>
+            <small className="muted">
+              Review fields are managed in Review workflow. Update measurement data, then Resubmit for Review.
+            </small>
+          </div>
+        ) : null}
+
+        <div className="form-grid">
+          <label>
+            Project
+            <select value={form.projectId} onChange={(e) => setProject(e.target.value)}>
+              <option value="">Select project…</option>
+              {activeProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Build / Phase
             <input
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              placeholder="Packaging"
+              value={form.buildPhase}
+              onChange={(e) => setForm({ ...form, buildPhase: e.target.value })}
+              placeholder="e.g. DV, PVT"
             />
           </label>
-        ) : null}
-
-        <label className="span-2">
-          Weight
-          <div className="weight-input">
-            <input
-              type="number"
-              step="any"
-              min="0"
-              value={form.weightValue}
-              onChange={(e) => setForm({ ...form, weightValue: e.target.value })}
-            />
-            <select
-              aria-label="Weight unit"
-              value={form.weightUnit}
-              onChange={(e) => setForm({ ...form, weightUnit: e.target.value as WeightUnit })}
-            >
-              <option value="g">g</option>
-              <option value="kg">kg</option>
+          <label>
+            Level
+            <select value={form.level} onChange={(e) => setLevel(e.target.value as Level)}>
+              {LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
             </select>
-          </div>
-          <small className="weight-preview">
-            Converted: {convertedKg != null && Number.isFinite(convertedKg) ? `${convertedKg.toFixed(3)} kg` : '—'}
-          </small>
-        </label>
+          </label>
 
-        <label className="span-2">
-          Configuration / Included Items
-          <input
-            value={form.configuration}
-            onChange={(e) => setForm({ ...form, configuration: e.target.value })}
-            placeholder="e.g. Full rack + pallet, Bare motherboard"
-          />
-        </label>
+          <label className="span-2">
+            Part Description
+            <input
+              ref={descriptionRef}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Part / node / rack / package description"
+            />
+          </label>
+          <label>
+            Lenovo PN
+            <input value={form.lenovoPn} onChange={(e) => setForm({ ...form, lenovoPn: e.target.value })} />
+          </label>
+          <label>
+            MSFT / Customer PN
+            <input value={form.customerPn} onChange={(e) => setForm({ ...form, customerPn: e.target.value })} />
+          </label>
+          {showPartFields ? (
+            <>
+              <label>
+                Manufacturer
+                <input
+                  value={form.manufacturer}
+                  onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
+                />
+              </label>
+              <label>
+                Part Category
+                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              </label>
+            </>
+          ) : null}
+          {showPackageHint ? (
+            <label className="span-2">
+              Part Category
+              <input
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="Packaging"
+              />
+            </label>
+          ) : null}
 
-        <label>
-          Source
-          <select
-            value={form.source}
-            onChange={(e) => setForm({ ...form, source: e.target.value as DataSource })}
-          >
-            {DATA_SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={showSupplierEmphasis ? undefined : 'soft-field'}>
-          Supplier / Data Provider
-          <input
-            value={form.supplier}
-            onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-            placeholder="e.g. Bromake, Guangda"
-          />
-        </label>
-        <label className={`span-2${showSupplierEmphasis ? '' : ' soft-field'}`}>
-          Reference / Document Rev.
-          <input
-            value={form.reference}
-            onChange={(e) => setForm({ ...form, reference: e.target.value })}
-            placeholder="e.g. PKG Weight List Rev.B"
-          />
-        </label>
+          <label className="span-2">
+            Weight
+            <div className="weight-input">
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={form.weightValue}
+                onChange={(e) => setForm({ ...form, weightValue: e.target.value })}
+              />
+              <select
+                aria-label="Weight unit"
+                value={form.weightUnit}
+                onChange={(e) => setForm({ ...form, weightUnit: e.target.value as WeightUnit })}
+              >
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+              </select>
+            </div>
+            <small className="weight-preview">
+              Converted: {convertedKg != null && Number.isFinite(convertedKg) ? `${convertedKg.toFixed(3)} kg` : '—'}
+            </small>
+          </label>
 
-        <label>
-          Measured By
-          <input
-            value={form.measuredBy}
-            onChange={(e) => setForm({ ...form, measuredBy: e.target.value })}
-            placeholder="Tester name"
-          />
-        </label>
-        <label>
-          Measured Date
-          <input
-            type="date"
-            value={form.measuredDate}
-            onChange={(e) => setForm({ ...form, measuredDate: e.target.value })}
-          />
-        </label>
+          <label className="span-2">
+            Configuration / Included Items{configRule === 'required' ? ' *' : ''}
+            <textarea
+              rows={2}
+              value={form.configuration}
+              onChange={(e) => setForm({ ...form, configuration: e.target.value })}
+              placeholder="e.g. Full rack + 8 GPU + HSK + PSU + cable, without pallet"
+            />
+            {configRule === 'required' && configEmpty ? (
+              <small className="field-error">Please specify what is included in this rack.</small>
+            ) : null}
+            {configRule === 'recommended' && configEmpty ? (
+              <small className="field-warn">
+                Included Items is recommended. Please specify what is included to ensure an accurate weight reference.
+              </small>
+            ) : null}
+            {configRule === 'optional' ? (
+              <small className="muted">Optional for Part-level records.</small>
+            ) : null}
+            {form.level === 'Rack' && !configEmpty ? (
+              <small className="muted">Example: Full rack + 8 GPU + HSK + PSU + cable, without pallet</small>
+            ) : null}
+          </label>
 
-        <label className="span-2">
-          Note
-          <textarea
-            rows={3}
-            value={form.note}
-            onChange={(e) => setForm({ ...form, note: e.target.value })}
-          />
-        </label>
-      </div>
-    </Modal>
+          <label>
+            Source
+            <select
+              value={form.source}
+              onChange={(e) => setForm({ ...form, source: e.target.value as DataSource })}
+            >
+              {DATA_SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={showSupplierEmphasis ? undefined : 'soft-field'}>
+            Supplier / Data Provider
+            <input
+              value={form.supplier}
+              onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+              placeholder="e.g. Bromake, Guangda"
+            />
+          </label>
+          <label className={`span-2${showSupplierEmphasis ? '' : ' soft-field'}`}>
+            Reference / Document Rev.
+            <input
+              value={form.reference}
+              onChange={(e) => setForm({ ...form, reference: e.target.value })}
+              placeholder="e.g. PKG Weight List Rev.B"
+            />
+          </label>
+
+          <label>
+            Measured By
+            <input
+              value={form.measuredBy}
+              onChange={(e) => setForm({ ...form, measuredBy: e.target.value })}
+              placeholder="Tester name"
+            />
+          </label>
+          <label>
+            Measured Date
+            <input
+              type="date"
+              value={form.measuredDate}
+              onChange={(e) => setForm({ ...form, measuredDate: e.target.value })}
+            />
+          </label>
+
+          <label className="span-2">
+            Notes
+            <textarea
+              rows={3}
+              maxLength={500}
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+            />
+            <small className="muted">{form.note.length} / 500</small>
+          </label>
+        </div>
+
+        <div className="alert info form-workflow-note">
+          Tester can only choose Draft or Submit for Review. Reviewer and Review Comment are managed in the Review
+          Modal.
+        </div>
+      </Modal>
+
+      {pending ? (
+        <DuplicateWarningModal
+          existing={pending.duplicate}
+          draft={pending.draft}
+          onCancel={() => setPending(null)}
+          onOpenExisting={() => {
+            const existing = pending.duplicate
+            setPending(null)
+            onClose()
+            onOpenExisting?.(existing)
+          }}
+          onSaveAnyway={() => {
+            const { intent, record } = pending
+            setPending(null)
+            commitRecord(intent, record)
+          }}
+        />
+      ) : null}
+    </>
   )
 }

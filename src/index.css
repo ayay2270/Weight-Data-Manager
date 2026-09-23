@@ -1438,13 +1438,30 @@ tr.clickable:hover {
 .dashboard-row-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   white-space: nowrap;
+  flex-wrap: wrap;
+}
+
+.dashboard-row-actions .button {
+  padding: 5px 10px;
+  font-size: 13px;
 }
 
 .dashboard-row-actions .button.ghost {
   padding: 4px 6px;
   font-size: 13px;
+}
+
+.button.action-recheck {
+  background: #c9851a;
+  border-color: #c9851a;
+  color: #fff;
+}
+
+.button.action-recheck:hover {
+  background: #b07416;
+  border-color: #b07416;
 }
 
 .dashboard-project-grid {
@@ -1615,5 +1632,287 @@ tr.clickable:hover {
   }
   .export-option-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* —— Duplicate warning —— */
+.duplicate-warning-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fff8eb;
+  border: 1px solid #f0d6a0;
+  color: #8a5a00;
+  margin-bottom: 16px;
+}
+
+.duplicate-warning-head p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.duplicate-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.duplicate-compare-col {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fcfdfe;
+}
+
+.duplicate-compare-col h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.duplicate-compare-col dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.duplicate-compare-col dl > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.duplicate-compare-col dt {
+  color: var(--muted);
+}
+
+.duplicate-compare-col dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* —— Record detail drawer —— */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.record-drawer {
+  width: min(520px, 100%);
+  height: 100%;
+  background: #fff;
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  animation: drawer-in 0.18s ease-out;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.record-drawer-head,
+.record-drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.record-drawer-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.record-drawer-head p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.record-drawer-foot {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.record-drawer-body {
+  padding: 16px 18px 24px;
+  overflow: auto;
+  display: grid;
+  gap: 18px;
+}
+
+.record-drawer-body h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.drawer-dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.drawer-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f4f7;
+}
+
+.drawer-row dt {
+  color: var(--muted);
+}
+
+.drawer-row dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+/* —— Export scopes —— */
+.export-scope-block {
+  margin: 8px 0 18px;
+}
+
+.export-scope-block h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.export-radio {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: #fcfdfe;
+}
+
+.export-radio.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.export-radio input {
+  margin-top: 3px;
+}
+
+.export-radio strong {
+  display: block;
+  font-size: 13px;
+}
+
+.export-radio small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.export-format-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.export-project-select {
+  margin: 0 0 10px 28px;
+  max-width: 320px;
+}
+
+.export-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.field-error {
+  display: block;
+  margin-top: 6px;
+  color: #8e3030;
+  font-size: 12px;
+}
+
+.field-warn {
+  display: block;
+  margin-top: 6px;
+  color: #8a5a00;
+  font-size: 12px;
+}
+
+.alert.info,
+.form-workflow-note {
+  background: #eef5ff;
+  color: #1f4f8a;
+  border-color: #c5d8f5;
+  font-size: 13px;
+}
+
+.form-workflow-note {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+.select-col {
+  width: 36px;
+  text-align: center;
+}
+
+.row-selected {
+  background: #f5f9ff;
+}
+
+button.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--blue);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+button.linkish:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .duplicate-compare {
+    grid-template-columns: 1fr;
+  }
+  .record-drawer {
+    width: 100%;
+  }
+  .drawer-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 }

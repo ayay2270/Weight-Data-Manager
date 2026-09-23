@@ -12,6 +12,7 @@ import {
   Box,
 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
+import { RecordDetailDrawer } from '../components/RecordDetailDrawer'
 import { RecordFormModal } from '../components/RecordFormModal'
 import { ReviewRecordModal } from '../components/ReviewRecordModal'
 import type { Level, RecordStatus, WeightRecord } from '../data/types'
@@ -68,6 +69,7 @@ export function DashboardPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState<WeightRecord | null>(null)
   const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
+  const [viewing, setViewing] = useState<WeightRecord | null>(null)
 
   const lastUpdated = latestUpdated({ version: 1, projects, records, settings })
   const pendingReviewCount = records.filter((r) => r.status === 'Pending Review').length
@@ -208,17 +210,22 @@ export function DashboardPage() {
                       <div className="dashboard-row-actions">
                         {r.status === 'Pending Review' ? (
                           <>
-                            <button type="button" className="button ghost" onClick={() => setReviewing(r)}>
-                              Verify
+                            <button type="button" className="button" onClick={() => setReviewing(r)}>
+                              Review
                             </button>
                             <button type="button" className="button ghost" onClick={() => openEdit(r)}>
-                              Review
+                              Edit
                             </button>
                           </>
                         ) : (
-                          <button type="button" className="button ghost" onClick={() => openEdit(r)}>
-                            Edit
-                          </button>
+                          <>
+                            <button type="button" className="button action-recheck" onClick={() => openEdit(r)}>
+                              Update Measurement
+                            </button>
+                            <button type="button" className="button ghost" onClick={() => setViewing(r)}>
+                              View
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -328,6 +335,7 @@ export function DashboardPage() {
                   <th>Weight</th>
                   <th>Reviewer</th>
                   <th>Verified At</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -343,11 +351,16 @@ export function DashboardPage() {
                     <td>{formatWeightKg(r)}</td>
                     <td>{r.reviewedBy || '—'}</td>
                     <td>{formatDateTime(r.reviewedDate || r.updatedAt)}</td>
+                    <td>
+                      <button type="button" className="button ghost" onClick={() => setViewing(r)}>
+                        View
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {!recentVerified.length ? (
                   <tr>
-                    <td colSpan={6} className="empty">
+                    <td colSpan={7} className="empty">
                       No verified records yet.
                     </td>
                   </tr>
@@ -361,6 +374,7 @@ export function DashboardPage() {
       <RecordFormModal
         open={showAdd || Boolean(editing)}
         projects={projects}
+        records={records}
         initial={editing}
         defaultProjectId={settings.defaultProjectId}
         defaultUnit={settings.defaultUnit}
@@ -369,8 +383,19 @@ export function DashboardPage() {
           setEditing(null)
         }}
         onSave={upsertRecord}
+        onOpenExisting={(record) => {
+          setShowAdd(false)
+          setEditing(null)
+          setViewing(record)
+        }}
       />
       <ReviewRecordModal key={reviewing?.id || 'none'} record={reviewing} onClose={() => setReviewing(null)} onSave={upsertRecord} />
+      <RecordDetailDrawer
+        record={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={openEdit}
+        onReview={(record) => setReviewing(record)}
+      />
     </>
   )
 }

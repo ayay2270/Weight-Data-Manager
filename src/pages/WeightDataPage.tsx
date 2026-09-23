@@ -1,13 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, Columns3, Copy, Pencil, Plus, RotateCcw, Trash2, X, ArrowDown, ArrowUp, ArrowUpDown, Save } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Columns3,
+  Copy,
+  Eye,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Save,
+} from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
+import { RecordDetailDrawer } from '../components/RecordDetailDrawer'
 import { RecordFormModal } from '../components/RecordFormModal'
 import { ReviewRecordModal } from '../components/ReviewRecordModal'
 import { Modal } from '../components/Modal'
 import { useData } from '../hooks/useData'
 import type { Level, WeightRecord } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
+import { saveExportContext } from '../utils/exportContext'
 import { formatWeightKg, getWeightKg, statusBadgeClass } from '../utils/helpers'
 
 type ColumnKey =
@@ -55,18 +72,14 @@ const COLUMN_OPTIONS: { key: ColumnKey; label: string; locked?: boolean }[] = [
   { key: 'actions', label: 'Actions' },
 ]
 
+/** Summary columns — full detail lives in the Record Detail Drawer. */
 const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   'project',
   'description',
   'lenovoPn',
-  'category',
   'level',
   'weight',
-  'note',
-  'source',
   'status',
-  'reviewedBy',
-  'reviewComment',
   'actions',
 ]
 
@@ -113,11 +126,6 @@ function loadSavedViews(): SavedView[] {
   }
 }
 
-function commentPreview(comment?: string | null): string {
-  if (!comment) return '—'
-  return comment.length > 28 ? `${comment.slice(0, 28)}…` : comment
-}
-
 export function WeightDataPage() {
   const { projects, records, settings, upsertRecord, deleteRecord, duplicateRecord } = useData()
   const [params] = useSearchParams()
@@ -139,6 +147,8 @@ export function WeightDataPage() {
   const [editing, setEditing] = useState<WeightRecord | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [reviewing, setReviewing] = useState<WeightRecord | null>(null)
+  const [viewing, setViewing] = useState<WeightRecord | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const buildPhaseOptions = useMemo(() => {
     const values = new Set<string>()
@@ -183,12 +193,18 @@ export function WeightDataPage() {
         const direction = sortDirection === 'asc' ? 1 : -1
         const field = (record: WeightRecord): string | number => {
           switch (sortKey) {
-            case 'project': return record.projectCode || ''
-            case 'description': return record.description || ''
-            case 'weight': return getWeightKg(record) ?? -1
-            case 'measuredDate': return record.measuredDate || ''
-            case 'status': return record.status || ''
-            case 'updated': return record.updatedAt || ''
+            case 'project':
+              return record.projectCode || ''
+            case 'description':
+              return record.description || ''
+            case 'weight':
+              return getWeightKg(record) ?? -1
+            case 'measuredDate':
+              return record.measuredDate || ''
+            case 'status':
+              return record.status || ''
+            case 'updated':
+              return record.updatedAt || ''
           }
         }
         const left = field(a)
@@ -199,10 +215,23 @@ export function WeightDataPage() {
       })
   }, [records, levelFilter, projectFilter, statusFilter, sourceFilter, buildPhaseFilter, query, sortKey, sortDirection])
 
+  useEffect(() => {
+    saveExportContext(
+      filtered.map((r) => r.id),
+      selectedIds.filter((id) => filtered.some((r) => r.id === id)),
+    )
+  }, [filtered, selectedIds])
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => records.some((r) => r.id === id)))
+  }, [records])
+
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const pageRecords = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+  const pageSelectedCount = pageRecords.filter((r) => selectedIds.includes(r.id)).length
+  const allPageSelected = pageRecords.length > 0 && pageSelectedCount === pageRecords.length
 
   function updateVisibleColumns(next: ColumnKey[]) {
     const normalized = [...new Set<ColumnKey>(['project', 'description', ...next])]
@@ -216,7 +245,17 @@ export function WeightDataPage() {
   }
 
   function currentViewState(): SavedView['state'] {
-    return { query, projectFilter, levelFilter, statusFilter, sourceFilter, buildPhaseFilter, visibleColumns, sortKey, sortDirection }
+    return {
+      query,
+      projectFilter,
+      levelFilter,
+      statusFilter,
+      sourceFilter,
+      buildPhaseFilter,
+      visibleColumns,
+      sortKey,
+      sortDirection,
+    }
   }
 
   function persistViews(next: SavedView[]) {
@@ -301,6 +340,21 @@ export function WeightDataPage() {
     setShowForm(true)
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  function toggleSelectPage() {
+    if (allPageSelected) {
+      const pageIds = new Set(pageRecords.map((r) => r.id))
+      setSelectedIds((prev) => prev.filter((id) => !pageIds.has(id)))
+      return
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...pageRecords.map((r) => r.id)])])
+  }
+
+  const colSpan = visibleColumns.length + 1
+
   return (
     <>
       <PageHeader
@@ -318,7 +372,12 @@ export function WeightDataPage() {
             Saved Views
             <select value={selectedViewId} onChange={(e) => applyView(e.target.value)}>
               <option value="all">All Records (Default)</option>
-              {savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}{view.isDefault ? ' (Default)' : ''}</option>)}
+              {savedViews.map((view) => (
+                <option key={view.id} value={view.id}>
+                  {view.name}
+                  {view.isDefault ? ' (Default)' : ''}
+                </option>
+              ))}
             </select>
           </label>
           <input
@@ -344,10 +403,13 @@ export function WeightDataPage() {
               setPage(1)
             }}
           />
-          <select value={projectFilter} onChange={(e) => {
-            setProjectFilter(e.target.value)
-            setPage(1)
-          }}>
+          <select
+            value={projectFilter}
+            onChange={(e) => {
+              setProjectFilter(e.target.value)
+              setPage(1)
+            }}
+          >
             <option value="">All projects</option>
             {projects.map((p) => (
               <option key={p.id} value={p.code}>
@@ -355,10 +417,13 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
-          <select value={levelFilter} onChange={(e) => {
-            setLevelFilter(e.target.value as Level | '')
-            setPage(1)
-          }}>
+          <select
+            value={levelFilter}
+            onChange={(e) => {
+              setLevelFilter(e.target.value as Level | '')
+              setPage(1)
+            }}
+          >
             <option value="">All levels</option>
             {LEVELS.map((level) => (
               <option key={level} value={level}>
@@ -366,10 +431,13 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
-          <select value={statusFilter} onChange={(e) => {
-            setStatusFilter(e.target.value)
-            setPage(1)
-          }}>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value)
+              setPage(1)
+            }}
+          >
             <option value="">All statuses</option>
             {RECORD_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -377,27 +445,27 @@ export function WeightDataPage() {
               </option>
             ))}
           </select>
-          <select value={sourceFilter} onChange={(e) => {
-            setSourceFilter(e.target.value)
-            setPage(1)
-          }}>
+          <select
+            value={sourceFilter}
+            onChange={(e) => {
+              setSourceFilter(e.target.value)
+              setPage(1)
+            }}
+          >
             <option value="">All sources</option>
-            {[
-              'Internal Measurement',
-              'Supplier',
-              'Specification',
-              'Estimated',
-              'Unknown',
-            ].map((s) => (
+            {['Internal Measurement', 'Supplier', 'Specification', 'Estimated', 'Unknown'].map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
             ))}
           </select>
-          <select value={buildPhaseFilter} onChange={(e) => {
-            setBuildPhaseFilter(e.target.value)
-            setPage(1)
-          }}>
+          <select
+            value={buildPhaseFilter}
+            onChange={(e) => {
+              setBuildPhaseFilter(e.target.value)
+              setPage(1)
+            }}
+          >
             <option value="">All build / phase</option>
             {buildPhaseOptions.map((s) => (
               <option key={s} value={s}>
@@ -431,12 +499,17 @@ export function WeightDataPage() {
                         disabled={column.locked}
                         onChange={() => toggleColumn(column.key)}
                       />
-                      {column.label}{column.locked ? ' (always shown)' : ''}
+                      {column.label}
+                      {column.locked ? ' (always shown)' : ''}
                     </label>
                   ))}
                 </div>
                 <div className="columns-dropdown-actions">
-                  <button type="button" className="button secondary" onClick={() => updateVisibleColumns(COLUMN_OPTIONS.map((column) => column.key))}>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => updateVisibleColumns(COLUMN_OPTIONS.map((column) => column.key))}
+                  >
                     Select All
                   </button>
                   <button type="button" className="button secondary" onClick={() => updateVisibleColumns(DEFAULT_VISIBLE_COLUMNS)}>
@@ -446,7 +519,10 @@ export function WeightDataPage() {
               </div>
             ) : null}
           </div>
-          <span className="muted">{filtered.length} shown</span>
+          <span className="muted">
+            {filtered.length} shown
+            {selectedIds.length ? ` · ${selectedIds.length} selected` : ''}
+          </span>
         </div>
 
         <div className="panel">
@@ -454,6 +530,14 @@ export function WeightDataPage() {
             <table>
               <thead>
                 <tr>
+                  <th className="select-col">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={toggleSelectPage}
+                      aria-label="Select all rows on this page"
+                    />
+                  </th>
                   {isVisible('project') ? sortableHeader('Project', 'project', 'weight-table-project') : null}
                   {isVisible('description') ? sortableHeader('Description', 'description', 'weight-table-description') : null}
                   {isVisible('lenovoPn') ? <th>Lenovo PN</th> : null}
@@ -476,11 +560,21 @@ export function WeightDataPage() {
               </thead>
               <tbody>
                 {pageRecords.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} className={selectedIds.includes(r.id) ? 'row-selected' : undefined}>
+                    <td className="select-col">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(r.id)}
+                        onChange={() => toggleSelect(r.id)}
+                        aria-label={`Select ${r.description || r.id}`}
+                      />
+                    </td>
                     {isVisible('project') ? <td className="weight-table-project">{r.projectCode || '—'}</td> : null}
                     {isVisible('description') ? (
                       <td className="weight-table-description" title={r.description}>
-                        <span className="description-text">{r.description || '—'}</span>
+                        <button type="button" className="linkish" onClick={() => setViewing(r)}>
+                          {r.description || '—'}
+                        </button>
                       </td>
                     ) : null}
                     {isVisible('lenovoPn') ? <td>{r.lenovoPn || '—'}</td> : null}
@@ -488,78 +582,92 @@ export function WeightDataPage() {
                     {isVisible('manufacturer') ? <td>{r.manufacturer || '—'}</td> : null}
                     {isVisible('category') ? <td>{r.category || '—'}</td> : null}
                     {isVisible('buildPhase') ? <td>{r.buildPhase || '—'}</td> : null}
-                    {isVisible('level') ? <td>
-                      <span className="badge level">{r.level}</span>
-                    </td> : null}
+                    {isVisible('level') ? (
+                      <td>
+                        <span className="badge level">{r.level}</span>
+                      </td>
+                    ) : null}
                     {isVisible('weight') ? <td>{formatWeightKg(r)}</td> : null}
                     {isVisible('measuredDate') ? <td>{r.measuredDate || '—'}</td> : null}
-                    {isVisible('note') ? <td className="weight-table-note" title={r.note || undefined}>{r.note || '—'}</td> : null}
+                    {isVisible('note') ? (
+                      <td className="weight-table-note" title={r.note || undefined}>
+                        {r.note || '—'}
+                      </td>
+                    ) : null}
                     {isVisible('source') ? <td>{r.source || '—'}</td> : null}
                     {isVisible('measuredBy') ? <td>{r.measuredBy || '—'}</td> : null}
-                    {isVisible('status') ? <td>
-                      <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
-                    </td> : null}
+                    {isVisible('status') ? (
+                      <td>
+                        <span className={`badge ${statusBadgeClass(r.status)}`}>{r.status}</span>
+                      </td>
+                    ) : null}
                     {isVisible('reviewedBy') ? <td>{r.reviewedBy || '—'}</td> : null}
-                    {isVisible('reviewComment') ? <td className="review-comment" title={r.reviewComment || undefined}>{commentPreview(r.reviewComment)}</td> : null}
+                    {isVisible('reviewComment') ? (
+                      <td className="review-comment" title={r.reviewComment || undefined}>
+                        {r.reviewComment
+                          ? r.reviewComment.length > 28
+                            ? `${r.reviewComment.slice(0, 28)}…`
+                            : r.reviewComment
+                          : '—'}
+                      </td>
+                    ) : null}
                     {isVisible('updated') ? <td>{r.updatedAt.slice(0, 10)}</td> : null}
-                    {isVisible('actions') ? <td>
-                      <div className="row-actions">
-                        {r.status === 'Pending Review' ? (
-                          <>
+                    {isVisible('actions') ? (
+                      <td>
+                        <div className="row-actions">
+                          <button type="button" className="button ghost" title="View" onClick={() => setViewing(r)}>
+                            <Eye size={15} />
+                          </button>
+                          {r.status === 'Pending Review' ? (
                             <button
                               type="button"
                               className="button ghost"
-                              title="Verify"
+                              title="Review"
                               onClick={() => setReviewing(r)}
                             >
                               <Check size={15} />
                             </button>
+                          ) : null}
+                          {r.status === 'Need Recheck' ? (
                             <button
                               type="button"
                               className="button ghost"
-                              title="Need Recheck"
-                              onClick={() => setReviewing(r)}
+                              title="Update Measurement"
+                              onClick={() => openEdit(r)}
                             >
                               <RotateCcw size={15} />
                             </button>
-                            <button
-                              type="button"
-                              className="button ghost"
-                              title="Reject"
-                              onClick={() => setReviewing(r)}
-                            >
-                              <X size={15} />
+                          ) : (
+                            <button type="button" className="button ghost" title="Edit" onClick={() => openEdit(r)}>
+                              <Pencil size={15} />
                             </button>
-                          </>
-                        ) : null}
-                        <button type="button" className="button ghost" title="Edit" onClick={() => openEdit(r)}>
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          className="button ghost"
-                          title="Duplicate"
-                          onClick={() => duplicateRecord(r.id)}
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          className="button ghost"
-                          title="Delete"
-                          onClick={() => {
-                            if (confirm('Delete this weight record?')) deleteRecord(r.id)
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td> : null}
+                          )}
+                          <button
+                            type="button"
+                            className="button ghost"
+                            title="Duplicate"
+                            onClick={() => duplicateRecord(r.id)}
+                          >
+                            <Copy size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="button ghost"
+                            title="Delete"
+                            onClick={() => {
+                              if (confirm('Delete this weight record?')) deleteRecord(r.id)
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
                 {!filtered.length ? (
                   <tr>
-                    <td colSpan={visibleColumns.length} className="empty">
+                    <td colSpan={colSpan} className="empty">
                       No records match the current filters.
                     </td>
                   </tr>
@@ -570,14 +678,29 @@ export function WeightDataPage() {
           {filtered.length ? (
             <div className="table-pagination">
               <span className="muted">
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} items
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
+                {filtered.length} items
               </span>
               <div className="pagination-actions">
-                <button type="button" className="button ghost" title="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+                <button
+                  type="button"
+                  className="button ghost"
+                  title="Previous page"
+                  disabled={currentPage === 1}
+                  onClick={() => setPage(currentPage - 1)}
+                >
                   <ChevronLeft size={16} />
                 </button>
-                <span>{currentPage} / {pageCount}</span>
-                <button type="button" className="button ghost" title="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>
+                <span>
+                  {currentPage} / {pageCount}
+                </span>
+                <button
+                  type="button"
+                  className="button ghost"
+                  title="Next page"
+                  disabled={currentPage === pageCount}
+                  onClick={() => setPage(currentPage + 1)}
+                >
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -589,6 +712,7 @@ export function WeightDataPage() {
       <RecordFormModal
         open={showForm}
         projects={projects}
+        records={records}
         initial={editing}
         defaultProjectId={
           projectFilter ? projects.find((p) => p.code === projectFilter)?.id : settings.defaultProjectId
@@ -596,26 +720,54 @@ export function WeightDataPage() {
         defaultUnit={settings.defaultUnit}
         onClose={() => setShowForm(false)}
         onSave={upsertRecord}
+        onOpenExisting={(record) => {
+          setShowForm(false)
+          setViewing(record)
+        }}
       />
-      <ReviewRecordModal key={reviewing?.id || 'none'} record={reviewing} onClose={() => setReviewing(null)} onSave={upsertRecord} />
+      <ReviewRecordModal
+        key={reviewing?.id || 'none'}
+        record={reviewing}
+        onClose={() => setReviewing(null)}
+        onSave={upsertRecord}
+      />
+      <RecordDetailDrawer
+        record={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={openEdit}
+        onReview={(record) => setReviewing(record)}
+      />
       {showManageViews ? (
         <Modal
           title="Manage Saved Views"
           onClose={() => setShowManageViews(false)}
-          footer={<button type="button" className="button secondary" onClick={() => setShowManageViews(false)}>Close</button>}
+          footer={
+            <button type="button" className="button secondary" onClick={() => setShowManageViews(false)}>
+              Close
+            </button>
+          }
         >
           <div className="saved-views-manager">
-            <div className="saved-view-row locked"><strong>All Records</strong><span className="muted">Default · always available</span></div>
+            <div className="saved-view-row locked">
+              <strong>All Records</strong>
+              <span className="muted">Default · always available</span>
+            </div>
             {savedViews.map((view) => (
               <div className="saved-view-row" key={view.id}>
                 <input
                   value={view.name}
-                  onChange={(e) => persistViews(savedViews.map((item) => item.id === view.id ? { ...item, name: e.target.value } : item))}
+                  onChange={(e) =>
+                    persistViews(
+                      savedViews.map((item) => (item.id === view.id ? { ...item, name: e.target.value } : item)),
+                    )
+                  }
                 />
                 <button
                   type="button"
                   className="button ghost"
-                  onClick={() => persistViews(savedViews.map((item) => ({ ...item, isDefault: item.id === view.id })))}
+                  onClick={() =>
+                    persistViews(savedViews.map((item) => ({ ...item, isDefault: item.id === view.id })))
+                  }
                 >
                   {view.isDefault ? 'Default' : 'Set Default'}
                 </button>

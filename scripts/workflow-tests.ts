@@ -1,4 +1,5 @@
 import { exportCsv } from '../src/utils/io'
+import { findPossibleDuplicate } from '../src/utils/duplicates'
 import { migrateRecordStatus, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
 import { normalizeAppData } from '../src/utils/storage'
 import type { AppData, WeightRecord } from '../src/data/types'
@@ -212,5 +213,72 @@ assertTruthy(exported.includes('Bromake'), 'export includes supplier value')
 
 // Legacy expectedItems still loads without breaking normalize
 assertTruthy(legacy.projects[0].expectedItems, 'legacy expectedItems retained for compatibility')
+
+// Duplicate detection
+const dupBase: WeightRecord[] = [
+  {
+    id: 'dup1',
+    projectId: 'prj_s219b',
+    projectCode: 'S219B',
+    level: 'Part',
+    description: 'S219B MB',
+    lenovoPn: '5C11A12345',
+    configuration: 'Bare motherboard',
+    weightValue: 1180,
+    weightUnit: 'g',
+    source: 'Internal Measurement',
+    status: 'Verified',
+    createdAt: '',
+    updatedAt: '',
+  },
+]
+
+assertEqual(
+  findPossibleDuplicate(
+    {
+      projectId: 'prj_s219b',
+      level: 'Part',
+      description: 'Other',
+      lenovoPn: '5C11A12345',
+      configuration: null,
+      buildPhase: 'DV',
+    },
+    dupBase,
+  )?.id,
+  'dup1',
+  'duplicate matches on Lenovo PN',
+)
+
+assertEqual(
+  findPossibleDuplicate(
+    {
+      projectId: 'prj_s219b',
+      level: 'Part',
+      description: 'S219B MB',
+      lenovoPn: null,
+      configuration: 'Bare motherboard',
+      buildPhase: null,
+    },
+    dupBase,
+  )?.id,
+  'dup1',
+  'duplicate soft-matches project+level+description+config',
+)
+
+assertEqual(
+  findPossibleDuplicate(
+    {
+      projectId: 'prj_s219b',
+      level: 'Part',
+      description: 'Totally different',
+      lenovoPn: 'OTHER',
+      configuration: 'x',
+      buildPhase: 'DV',
+    },
+    dupBase,
+  ),
+  null,
+  'non-duplicate returns null',
+)
 
 console.log('Workflow verification complete.')

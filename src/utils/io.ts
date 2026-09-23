@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { AppData, Level, WeightUnit } from '../data/types'
+import type { AppData, Level, WeightRecord, WeightUnit } from '../data/types'
 import { getWeightKg } from './helpers'
 
 const LEVEL_SHEETS: { level: Level; names: string[]; defaultUnit: WeightUnit }[] = [
@@ -9,11 +9,16 @@ const LEVEL_SHEETS: { level: Level; names: string[]; defaultUnit: WeightUnit }[]
   { level: 'Package', names: ['Package'], defaultUnit: 'kg' },
 ]
 
-export function exportWorkbook(data: AppData): ArrayBuffer {
+function recordsForExport(data: AppData, subset?: WeightRecord[]): WeightRecord[] {
+  return subset ?? data.records
+}
+
+export function exportWorkbook(data: AppData, subset?: WeightRecord[]): ArrayBuffer {
+  const source = recordsForExport(data, subset)
   const wb = XLSX.utils.book_new()
   for (const { level, names } of LEVEL_SHEETS) {
     const sheetName = names[0]
-    const rows = data.records
+    const rows = source
       .filter((r) => r.level === level)
       .map((r) => ({
         'Part Description': r.description,
@@ -41,7 +46,8 @@ export function exportWorkbook(data: AppData): ArrayBuffer {
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
 }
 
-export function exportCsv(data: AppData): string {
+export function exportCsv(data: AppData, subset?: WeightRecord[]): string {
+  const source = recordsForExport(data, subset)
   const header = [
     'Level',
     'Project',
@@ -65,7 +71,7 @@ export function exportCsv(data: AppData): string {
     'Note',
   ]
   const lines = [header.join(',')]
-  for (const r of data.records) {
+  for (const r of source) {
     const cols = [
       r.level,
       r.projectCode,
