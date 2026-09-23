@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit } from '../data/types'
 import { DATA_SOURCES, LEVELS } from '../data/types'
 import { findPossibleDuplicate } from '../utils/duplicates'
-import { nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
+import { canEditMeasurement, nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
 import { DuplicateWarningModal, type DuplicateDraft } from './DuplicateWarningModal'
 import { Modal } from './Modal'
 
@@ -212,6 +212,16 @@ export function RecordFormModal({
       }
     }
 
+    // Saving a Verified record requires a new review round.
+    if (intent === 'keep' && initial.status === 'Verified') {
+      return {
+        status: 'Pending Review',
+        reviewedBy: null,
+        reviewedDate: null,
+        reviewComment: null,
+      }
+    }
+
     return {
       status: initial.status,
       reviewedBy: initial.reviewedBy ?? null,
@@ -232,12 +242,18 @@ export function RecordFormModal({
       return null
     }
 
-    if (initial && initial.status !== 'Draft' && initial.status !== 'Need Recheck') {
+    if (initial && !canEditMeasurement(initial.status)) {
       setError('This record cannot be edited in its current status.')
       return null
     }
 
-    if (intent === 'submit' || intent === 'resubmit' || intent === 'addNext') {
+    const requiresSubmitValidation =
+      intent === 'submit' ||
+      intent === 'resubmit' ||
+      intent === 'addNext' ||
+      (intent === 'keep' && initial?.status === 'Verified')
+
+    if (requiresSubmitValidation) {
       if (weightValue == null || !(weightValue > 0)) {
         setError('Weight must be greater than zero before submitting for review.')
         return null
@@ -363,6 +379,21 @@ export function RecordFormModal({
 
   function footerActions() {
     if (!initial) {
+      if (prefill) {
+        return (
+          <>
+            <button type="button" className="button secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="button" className="button secondary" onClick={() => handleSave('draft')}>
+              Save Draft
+            </button>
+            <button type="button" className="button" onClick={() => handleSave('submit')}>
+              Submit for Review
+            </button>
+          </>
+        )
+      }
       return (
         <>
           <button type="button" className="button secondary" onClick={onClose}>
@@ -410,13 +441,23 @@ export function RecordFormModal({
       )
     }
 
+    if (currentStatus === 'Verified') {
+      return (
+        <>
+          <button type="button" className="button secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="button" onClick={() => handleSave('keep')}>
+            Save
+          </button>
+        </>
+      )
+    }
+
     return (
       <>
         <button type="button" className="button secondary" onClick={onClose}>
           Cancel
-        </button>
-        <button type="button" className="button" onClick={() => handleSave('keep')}>
-          Save
         </button>
       </>
     )
@@ -437,6 +478,18 @@ export function RecordFormModal({
                 <span className="muted">Reason:</span> {recheckReason}
               </span>
             ) : null}
+            {currentStatus === 'Verified' && initial?.reviewedBy ? (
+              <span className="form-status-reason">
+                <span className="muted">Reviewed By:</span> {initial.reviewedBy}
+                {initial.reviewedDate ? ` · ${initial.reviewedDate}` : ''}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {currentStatus === 'Verified' ? (
+          <div className="alert info form-verified-edit-note">
+            Editing a verified record will require review again.
           </div>
         ) : null}
 

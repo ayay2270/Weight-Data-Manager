@@ -24,9 +24,9 @@ export function statusBadgeClass(status: string): string {
   return status.replace(/\s+/g, '-')
 }
 
-/** Tester may change measurement data only while the record is Draft or Need Recheck. */
+/** Tester may edit measurement data for Draft, Need Recheck, or Verified. */
 export function canEditMeasurement(status: string): boolean {
-  return status === 'Draft' || status === 'Need Recheck'
+  return status === 'Draft' || status === 'Need Recheck' || status === 'Verified'
 }
 
 /** Projects with child records cannot be deleted from the data layer. */

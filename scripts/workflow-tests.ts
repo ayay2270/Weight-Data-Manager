@@ -1,6 +1,6 @@
 import { exportCsv } from '../src/utils/io'
 import { findPossibleDuplicate } from '../src/utils/duplicates'
-import { canDeleteProject, migrateRecordStatus, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
+import { canDeleteProject, canEditMeasurement, migrateRecordStatus, normalizeWeightRecord, toWeightKg } from '../src/utils/helpers'
 import { normalizeAppData } from '../src/utils/storage'
 import type { AppData, WeightRecord } from '../src/data/types'
 
@@ -196,6 +196,45 @@ assertEqual(resubmitted.status, 'Pending Review', 'resubmit → Pending Review')
 assertEqual(resubmitted.reviewedBy, null, 'resubmit clears reviewedBy for a new review round')
 assertEqual(resubmitted.reviewComment, null, 'resubmit clears review comment')
 assertEqual(resubmitted.weight_kg, 1.2, 'resubmit updates measurement weight')
+
+// Edit permission + Verified re-edit workflow
+assertEqual(canEditMeasurement('Draft'), true, 'A Draft → Edit allowed')
+assertEqual(canEditMeasurement('Need Recheck'), true, 'B Need Recheck → Edit allowed')
+assertEqual(canEditMeasurement('Verified'), true, 'C Verified → Edit allowed')
+assertEqual(canEditMeasurement('Pending Review'), false, 'D Pending Review → Edit NOT allowed')
+assertEqual(canEditMeasurement('Rejected'), false, 'E Rejected → Edit NOT allowed')
+
+const verifiedEdited = normalizeWeightRecord({
+  ...verified,
+  weightValue: 1.2,
+  weightUnit: 'kg',
+  status: 'Pending Review',
+  reviewedBy: null,
+  reviewedDate: null,
+  reviewComment: null,
+})
+assertEqual(verifiedEdited.weight_kg, 1.2, 'F verified edit weight')
+assertEqual(verifiedEdited.status, 'Pending Review', 'F Verified Save → Pending Review')
+assertEqual(verifiedEdited.reviewedBy, null, 'F verified edit clears reviewedBy')
+assertEqual(verifiedEdited.reviewedDate, null, 'F verified edit clears reviewedDate')
+assertEqual(verifiedEdited.reviewComment, null, 'F verified edit clears reviewComment')
+
+assertEqual(verified.status, 'Verified', 'G Cancel leaves source Verified')
+assertEqual(verified.reviewedBy, 'Jason', 'G Cancel keeps reviewedBy')
+assertEqual(verified.reviewedDate, '2026-09-23', 'G Cancel keeps reviewedDate')
+
+const duplicatedDraft = normalizeWeightRecord({
+  ...verified,
+  id: 'rec_dup_draft',
+  status: 'Draft',
+  reviewedBy: null,
+  reviewedDate: null,
+  reviewComment: null,
+})
+assertEqual(duplicatedDraft.status, 'Draft', 'H Duplicate → Draft')
+assertEqual(duplicatedDraft.reviewedBy, null, 'H Duplicate clears reviewedBy')
+assertEqual(duplicatedDraft.reviewedDate, null, 'H Duplicate clears reviewedDate')
+assertEqual(duplicatedDraft.reviewComment, null, 'H Duplicate clears reviewComment')
 
 const exported = exportCsv({
   ...base,

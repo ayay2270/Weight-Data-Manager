@@ -2014,6 +2014,10 @@ body.col-resizing {
   margin-bottom: 0;
 }
 
+.form-verified-edit-note {
+  margin-bottom: 14px;
+}
+
 .select-col {
   width: 36px;
   text-align: center;

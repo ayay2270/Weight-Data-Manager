@@ -10,6 +10,7 @@ import { useData } from '../hooks/useData'
 import type { Project, RecordStatus, WeightRecord } from '../data/types'
 import { LEVELS, RECORD_STATUSES } from '../data/types'
 import {
+  canEditMeasurement,
   countByLevel,
   formatDate,
   formatWeightKg,
@@ -406,7 +407,7 @@ export function ProjectDetailPage() {
         record={viewing}
         onClose={() => setViewing(null)}
         onEdit={(record) => {
-          if (record.status !== 'Draft' && record.status !== 'Need Recheck') return
+          if (!canEditMeasurement(record.status)) return
           setEditingRecord(record)
           setShowRecordForm(true)
         }}

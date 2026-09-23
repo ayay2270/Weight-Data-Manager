@@ -10,7 +10,7 @@ import {
 import type { AppData, AppSettings, Project, WeightRecord } from '../data/types'
 import { canDeleteProject, normalizeWeightRecord, nowIso } from '../utils/helpers'
 
-const LOCKED_MEASUREMENT_STATUSES = new Set(['Pending Review', 'Verified', 'Rejected'])
+const LOCKED_MEASUREMENT_STATUSES = new Set(['Pending Review', 'Rejected'])
 
 function measurementUnchanged(existing: WeightRecord, next: WeightRecord): boolean {
   const keys: (keyof WeightRecord)[] = [

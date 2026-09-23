@@ -1,6 +1,6 @@
-import { Pencil, RotateCcw, X } from 'lucide-react'
+import { Pencil, Check, X } from 'lucide-react'
 import type { WeightRecord } from '../data/types'
-import { formatWeightKg, statusBadgeClass } from '../utils/helpers'
+import { canEditMeasurement, formatWeightKg, statusBadgeClass } from '../utils/helpers'
 
 interface RecordDetailDrawerProps {
   record: WeightRecord | null
@@ -23,8 +23,7 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
   if (!record) return null
 
   const isPending = record.status === 'Pending Review'
-  const isRecheck = record.status === 'Need Recheck'
-  const isDraft = record.status === 'Draft'
+  const canEdit = canEditMeasurement(record.status)
 
   return (
     <div className="drawer-backdrop" onClick={onClose} role="presentation">
@@ -88,31 +87,22 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
           {isPending && onReview ? (
             <button
               type="button"
-              className="button"
+              className="button secondary"
               onClick={() => {
                 onReview(record)
                 onClose()
               }}
             >
-              Review
+              <Check size={15} /> Review
             </button>
           ) : null}
-          {isRecheck && onEdit ? (
+          <button type="button" className="button secondary" onClick={onClose}>
+            Close
+          </button>
+          {canEdit && onEdit ? (
             <button
               type="button"
               className="button"
-              onClick={() => {
-                onEdit(record)
-                onClose()
-              }}
-            >
-              <RotateCcw size={15} /> Update Measurement
-            </button>
-          ) : null}
-          {isDraft && onEdit ? (
-            <button
-              type="button"
-              className="button secondary"
               onClick={() => {
                 onEdit(record)
                 onClose()
@@ -121,9 +111,6 @@ export function RecordDetailDrawer({ record, onClose, onEdit, onReview }: Record
               <Pencil size={15} /> Edit Record
             </button>
           ) : null}
-          <button type="button" className="button secondary" onClick={onClose}>
-            Close
-          </button>
         </div>
       </aside>
     </div>

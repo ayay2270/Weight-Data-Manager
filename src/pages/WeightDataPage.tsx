@@ -745,7 +745,7 @@ export function WeightDataPage() {
                               <RotateCcw size={15} />
                             </button>
                           ) : null}
-                          {r.status === 'Draft' ? (
+                          {canEditMeasurement(r.status) ? (
                             <button type="button" className="button ghost" title="Edit" onClick={() => openEdit(r)}>
                               <Pencil size={15} />
                             </button>
