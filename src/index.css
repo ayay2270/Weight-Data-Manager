@@ -647,37 +647,55 @@ tr.clickable:hover {
 
 .resizable-header {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
   position: relative;
+  min-height: 100%;
+  margin: -11px -10px -11px 0;
+  padding-right: 2px;
+}
+
+.resizable-header .sort-header {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 8px 11px 10px;
 }
 
 .col-resize-handle {
-  flex: 0 0 8px;
+  flex: 0 0 14px;
+  width: 14px;
   align-self: stretch;
   cursor: col-resize;
   position: relative;
+  z-index: 1;
 }
 
 .col-resize-handle::after {
   content: '';
   position: absolute;
-  top: 20%;
-  right: 3px;
-  bottom: 20%;
+  top: 14%;
+  right: 6px;
+  bottom: 14%;
   width: 2px;
   border-radius: 1px;
-  background: #c5ced8;
+  background: #aeb9c8;
 }
 
 .col-resize-handle:hover::after,
 body.col-resizing .col-resize-handle::after {
   background: var(--blue);
+  width: 3px;
+  right: 5px;
 }
 
 body.col-resizing {
   cursor: col-resize;
   user-select: none;
+}
+
+.weight-table-description .linkish {
+  display: block;
+  width: 100%;
+  max-width: 100%;
 }
 
 .weight-table-description .description-text {
@@ -687,8 +705,9 @@ body.col-resizing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: normal;
-  line-height: 1.3;
+  line-height: 1.35;
   max-width: 100%;
+  word-break: break-word;
 }
 
 .weight-table-note {

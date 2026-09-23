@@ -398,6 +398,7 @@ export function WeightDataPage() {
             aria-orientation="vertical"
             aria-label="Resize Description column"
             onMouseDown={startDescriptionResize}
+            onClick={(event) => event.stopPropagation()}
           />
         </div>
       </th>
@@ -655,9 +656,9 @@ export function WeightDataPage() {
                     </td>
                     {isVisible('project') ? <td className="weight-table-project">{r.projectCode || '—'}</td> : null}
                     {isVisible('description') ? (
-                      <td className="weight-table-description" style={descriptionColumnStyle} title={r.description}>
+                      <td className="weight-table-description" style={descriptionColumnStyle} title={r.description || undefined}>
                         <button type="button" className="linkish" onClick={() => setViewing(r)}>
-                          {r.description || '—'}
+                          <span className="description-text">{r.description || '—'}</span>
                         </button>
                       </td>
                     ) : null}
