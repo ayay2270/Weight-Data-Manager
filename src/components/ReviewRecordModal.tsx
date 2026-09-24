@@ -82,19 +82,44 @@ export function ReviewRecordModal({ record, onClose, onSave }: ReviewRecordModal
           </dl>
         </section>
         <section className="review-controls">
-          <label>
-            Reviewer *
-            <input autoFocus value={reviewer} onChange={(e) => setReviewer(e.target.value)} placeholder="Engineer name" />
+          <label className="review-field">
+            <span className="required-label">
+              <span className="required-mark" aria-hidden="true">
+                *
+              </span>
+              Reviewer
+            </span>
+            <input
+              autoFocus
+              value={reviewer}
+              onChange={(e) => setReviewer(e.target.value)}
+              placeholder="Engineer name"
+            />
           </label>
-          <label>
+          <label className="review-field">
             Review Comment
-            <textarea maxLength={500} rows={6} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional for Verify; required for Need Recheck and Reject" />
+            <textarea
+              maxLength={500}
+              rows={2}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Optional for Verify; required for Need Recheck and Reject"
+            />
             <small>{comment.length} / 500</small>
           </label>
           <div className="review-action-buttons">
-            <button type="button" className="button review-verify" onClick={() => submit('Verified')}><Check size={18} /> Verify</button>
-            <button type="button" className="button review-recheck" onClick={() => submit('Need Recheck')}><RotateCcw size={18} /> Need Recheck</button>
-            <button type="button" className="button review-reject" onClick={() => submit('Rejected')}><X size={18} /> Reject</button>
+            <button type="button" className="button review-verify" onClick={() => submit('Verified')}>
+              <Check size={22} strokeWidth={2.5} />
+              Verify
+            </button>
+            <button type="button" className="button review-recheck" onClick={() => submit('Need Recheck')}>
+              <RotateCcw size={22} strokeWidth={2.5} />
+              Need Recheck
+            </button>
+            <button type="button" className="button review-reject" onClick={() => submit('Rejected')}>
+              <X size={22} strokeWidth={2.5} />
+              Reject
+            </button>
           </div>
         </section>
       </div>
