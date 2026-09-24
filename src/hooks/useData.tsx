@@ -45,6 +45,8 @@ interface DataContextValue {
   upsertProject: (project: Project) => void
   deleteProject: (id: string) => boolean
   upsertRecord: (record: WeightRecord) => void
+  /** Append many new records in one write (atomic import). */
+  appendRecords: (records: WeightRecord[]) => void
   deleteRecord: (id: string) => void
   updateSettings: (patch: Partial<AppSettings>) => void
   resetDemoData: () => void
@@ -129,6 +131,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const appendRecords = useCallback((incoming: WeightRecord[]) => {
+    if (!incoming.length) return
+    setData((prev) => {
+      const stamp = nowIso()
+      const next = incoming.map((record) => ({
+        ...normalizeWeightRecord(record),
+        createdAt: record.createdAt || stamp,
+        updatedAt: stamp,
+      }))
+      return {
+        ...prev,
+        records: [...prev.records, ...next],
+        settings: { ...prev.settings, lastUpdated: stamp },
+      }
+    })
+  }, [])
+
   const deleteRecord = useCallback((id: string) => {
     setData((prev) => {
       const existing = prev.records.find((record) => record.id === id)
@@ -168,6 +187,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       upsertProject,
       deleteProject,
       upsertRecord,
+      appendRecords,
       deleteRecord,
       updateSettings,
       resetDemoData,
@@ -179,6 +199,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       upsertProject,
       deleteProject,
       upsertRecord,
+      appendRecords,
       deleteRecord,
       updateSettings,
       resetDemoData,

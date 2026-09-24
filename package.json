@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test:weights": "tsx scripts/weight-unit-tests.ts",
     "test:workflow": "tsx scripts/workflow-tests.ts",
-    "test": "npm run test:weights && npm run test:workflow"
+    "test:import": "tsx scripts/import-workbook-tests.ts",
+    "test:import-e2e": "tsx scripts/import-e2e.ts",
+    "test": "npm run test:weights && npm run test:workflow && npm run test:import && npm run test:import-e2e"
   },
   "dependencies": {
     "lucide-react": "^1.47.0",

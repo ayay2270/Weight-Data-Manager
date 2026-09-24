@@ -3,6 +3,8 @@ import type { DataSource, Level, Project, RecordStatus, WeightRecord, WeightUnit
 import { DATA_SOURCES, LEVELS } from '../data/types'
 import { findPossibleDuplicate } from '../utils/duplicates'
 import { canEditMeasurement, nowIso, todayDate, toWeightKg, uid } from '../utils/helpers'
+import { validateSubmitMeasurement } from '../utils/recordValidation'
+import { configRequirement } from '../utils/weightWorkbookSchema'
 import { DuplicateWarningModal, type DuplicateDraft } from './DuplicateWarningModal'
 import { Modal } from './Modal'
 
@@ -39,12 +41,6 @@ const emptyForm = {
   measuredBy: '',
   measuredDate: '',
   note: '',
-}
-
-function configRequirement(level: Level): 'optional' | 'recommended' | 'required' {
-  if (level === 'Rack') return 'required'
-  if (level === 'Node' || level === 'Package') return 'recommended'
-  return 'optional'
 }
 
 function RequiredLabel({ children }: { children: string }) {
@@ -254,24 +250,19 @@ export function RecordFormModal({
       (intent === 'keep' && initial?.status === 'Verified')
 
     if (requiresSubmitValidation) {
-      if (weightValue == null || !(weightValue > 0)) {
-        setError('Weight must be greater than zero before submitting for review.')
-        return null
-      }
-      if (!form.measuredBy.trim()) {
-        setError('Measured By is required before submitting for review.')
-        return null
-      }
-      if (!form.measuredDate) {
-        setError('Measured Date is required before submitting for review.')
-        return null
-      }
-      if (configRule === 'required' && configEmpty) {
-        setError('Please specify what is included in this rack.')
-        return null
-      }
-      if (form.source === 'Supplier' && !form.supplier.trim()) {
-        setError('Supplier / Data Provider is required before submitting for review when Source is Supplier.')
+      const submitIssues = validateSubmitMeasurement({
+        level: form.level,
+        description: form.description,
+        weightValue,
+        weightUnit: form.weightUnit,
+        configuration: form.configuration,
+        source: form.source,
+        supplier: form.supplier,
+        measuredBy: form.measuredBy,
+        measuredDate: form.measuredDate,
+      })
+      if (submitIssues.length) {
+        setError(submitIssues[0].message)
         return null
       }
     }

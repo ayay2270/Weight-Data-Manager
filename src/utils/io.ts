@@ -1,44 +1,40 @@
 import * as XLSX from 'xlsx'
-import type { AppData, Level, WeightRecord, WeightUnit } from '../data/types'
+import type { AppData, WeightRecord } from '../data/types'
 import { getWeightKg } from './helpers'
-
-const LEVEL_SHEETS: { level: Level; names: string[]; defaultUnit: WeightUnit }[] = [
-  { level: 'Part', names: ['Part Level', 'Part'], defaultUnit: 'g' },
-  { level: 'Node', names: ['Node Level', 'Node'], defaultUnit: 'kg' },
-  { level: 'Rack', names: ['Rack Level', 'Rack'], defaultUnit: 'kg' },
-  { level: 'Package', names: ['Package'], defaultUnit: 'kg' },
-]
+import { LEVEL_SHEETS } from './weightWorkbookSchema'
 
 function recordsForExport(data: AppData, subset?: WeightRecord[]): WeightRecord[] {
   return subset ?? data.records
 }
 
+/** Excel export by level sheets — same sheet names as Import Template. Export may include workflow columns Import does not accept. */
 export function exportWorkbook(data: AppData, subset?: WeightRecord[]): ArrayBuffer {
   const source = recordsForExport(data, subset)
   const wb = XLSX.utils.book_new()
-  for (const { level, names } of LEVEL_SHEETS) {
-    const sheetName = names[0]
+  for (const { level, sheetName } of LEVEL_SHEETS) {
     const rows = source
       .filter((r) => r.level === level)
       .map((r) => ({
+        Project: r.projectCode,
+        'Build / Phase': r.buildPhase || '',
         Description: r.description,
         'Lenovo PN': r.lenovoPn || '',
         'MSFT PN': r.customerPn || '',
         Manufacturer: r.manufacturer || '',
         'Part Category': r.category || '',
+        Weight: r.weightValue ?? '',
+        Unit: r.weightUnit || '',
         'Weight (kg)': getWeightKg(r) ?? r.originalWeightText ?? '',
-        'Build / Phase': r.buildPhase || '',
         'Configuration / Included Items': r.configuration || '',
+        Source: r.source,
         'Supplier / Data Provider': r.supplier || '',
         'Reference / Document Rev.': r.reference || '',
         'Measured By': r.measuredBy || '',
         'Measured Date': r.measuredDate || '',
+        Note: r.note || '',
+        Status: r.status,
         'Reviewed By': r.reviewedBy || '',
         'Reviewed Date': r.reviewedDate || '',
-        Project: r.projectCode,
-        Note: r.note || '',
-        Source: r.source,
-        Status: r.status,
       }))
     const ws = XLSX.utils.json_to_sheet(rows)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
@@ -57,8 +53,9 @@ export function exportCsv(data: AppData, subset?: WeightRecord[]): string {
     'MSFT PN',
     'Manufacturer',
     'Category',
-    'Weight (kg)',
+    'Weight',
     'Unit',
+    'Weight (kg)',
     'Configuration / Included Items',
     'Supplier / Data Provider',
     'Reference / Document Rev.',
@@ -81,8 +78,9 @@ export function exportCsv(data: AppData, subset?: WeightRecord[]): string {
       r.customerPn || '',
       r.manufacturer || '',
       r.category || '',
+      r.weightValue ?? '',
+      r.weightUnit || '',
       getWeightKg(r) ?? '',
-      'kg',
       r.configuration || '',
       r.supplier || '',
       r.reference || '',

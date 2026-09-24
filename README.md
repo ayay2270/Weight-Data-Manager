@@ -12,7 +12,7 @@ Replace scattered Excel weight logs with a focused web app that:
 - Supports Tester submission for engineer review
 - Supports Engineer review (Verified / Need Recheck / Rejected)
 - Provides project management, search / filter / sorting, saved views, and record detail drawer
-- Exports Excel and CSV, plus JSON backup from Settings
+- Exports Excel and CSV, imports Excel via the official template, plus JSON backup from Settings
 
 ## Users
 
@@ -28,7 +28,7 @@ Replace scattered Excel weight logs with a focused web app that:
 4. Enter measurements in **Weight Data**, then **Submit for Review** or **Submit & Add Next**.
 5. Engineers open **Review** on Pending Review rows → Verify / Need Recheck / Reject.
 6. Need Recheck rows return to the Tester for edits, then **Resubmit for Review**.
-7. Use **Export** for Excel/CSV hand-off; use **Settings** for JSON backup or demo reset.
+7. Use **Import / Export** for Excel import (official template) or Excel/CSV export; use **Settings** for JSON backup or demo reset.
 
 ## Core features
 
@@ -41,6 +41,7 @@ Replace scattered Excel weight logs with a focused web app that:
 - Resizable Description column in Weight Data table
 - Record Detail Drawer for full record view
 - Export to Excel / CSV (all / filtered / project / selected scopes)
+- Import Excel using the generated `Weight_Data_Import_Template.xlsx` (Draft or Submit for Review)
 - Settings: JSON backup / restore, reset demo data
 
 ## Add Record flow
@@ -65,7 +66,7 @@ Duplicate opens the Add Record form with fields prefilled from the source record
 ```text
 src/
   components/   Sidebar, modals, record form, review modal, record detail drawer
-  pages/        Dashboard, Projects, Weight Data, Export, Settings
+  pages/        Dashboard, Projects, Weight Data, Import/Export, Settings
   data/         types + seed.json
   hooks/        LocalStorage data provider
   utils/        helpers, Excel/CSV export, storage
